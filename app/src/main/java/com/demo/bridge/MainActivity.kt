@@ -2,10 +2,15 @@ package com.demo.bridge
 
 import android.app.Activity
 import android.os.Bundle
+import android.widget.TextView
 
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // 桥接入口，后续扩展命令路由
+        val tv = TextView(this).apply {
+            text = "BridgeApp OK"
+            textSize = 24f
+        }
+        setContentView(tv)
     }
 }
