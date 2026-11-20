@@ -7,6 +7,14 @@ import com.rosan.dhizuku.api.DhizukuRequestPermissionListener
 
 object DhizukuAuth {
 
+    fun init(context: Context) {
+        try {
+            // 初始化兜底，不向上抛异常
+        } catch (e: Throwable) {
+            // 由 isReady() 统一降级
+        }
+    }
+
     fun isReady(): Boolean = try {
         Dhizuku.isPermissionGranted() && Dhizuku.getRemoteBinder() != null
     } catch (e: Throwable) {
@@ -35,5 +43,11 @@ object DhizukuAuth {
         } catch (e: Throwable) {
             onDenied()
         }
+    }
+
+    fun run(block: () -> String): String = try {
+        block()
+    } catch (e: Throwable) {
+        "ERR: ${e.message ?: e.javaClass.simpleName}"
     }
 }
