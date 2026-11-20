@@ -10,7 +10,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 外部接口调用：带 cmd 参数
         val cmdParam = intent.getStringExtra("cmd")
         if (!cmdParam.isNullOrBlank()) {
             val indices = cmdParam.split(",").mapNotNull { it.trim().toIntOrNull() }
@@ -24,7 +23,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 内部启动：走已选命令
         val selected = loadSelected()
         if (selected.isNotEmpty()) {
             Intent(this, BridgeService::class.java).also {
@@ -33,7 +31,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 进管理界面
         startActivity(Intent(this, CommandActivity::class.java))
         finish()
     }
