@@ -19,6 +19,13 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.6'
+      - name: Configure JitPack auth
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties <<EOF
+          jitpackUsername=${{ github.actor }}
+          jitpackPassword=${{ secrets.GITHUB_TOKEN }}
+          EOF
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon
       - name: Upload APK
@@ -26,5 +33,3 @@ jobs:
         with:
           name: bridge-app-debug
           path: app/build/outputs/apk/debug/*.apk
-
-    
