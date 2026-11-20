@@ -3,15 +3,13 @@ package com.demo.bridge
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.CheckBox
-import android.widget.Toast
 import android.widget.TextView
-import java.io.File
+import android.widget.Toast
 
 class CommandAdapter(
     private val context: Context,
@@ -39,9 +37,7 @@ class CommandAdapter(
             setEnabled(item.file, isChecked)
         }
 
-        view.setOnClickListener {
-            showMenu(item)
-        }
+        view.setOnClickListener { showMenu(item) }
         return view
     }
 
@@ -79,15 +75,14 @@ class CommandAdapter(
     }
 
     private fun debug(item: CommandItem) {
-        // 这里先占位，后面接 BridgeService 执行命令
-        Toast(context, "调试：${item.file.name}", Toast.LENGTH_SHORT).show()
+        val result = BridgeService().doExecute(item.file.readText().trim())
+        Toast.makeText(context, result, Toast.LENGTH_LONG).show()
     }
 
     private fun export(item: CommandItem) {
-        val uri = Uri.fromFile(item.file)
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "*/*"
-            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_STREAM, Uri.fromFile(item.file))
         }
         context.startActivity(Intent.createChooser(intent, "导出命令"))
     }
