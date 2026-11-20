@@ -2,9 +2,11 @@ package com.demo.bridge
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
-import android.widget.*
+import android.widget.ListView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
@@ -48,6 +50,7 @@ class CommandActivity : AppCompatActivity() {
         }
         startActivityForResult(Intent.createChooser(intent, "导入命令"), 101)
     }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == Activity.RESULT_OK && data != null) {
@@ -55,19 +58,16 @@ class CommandActivity : AppCompatActivity() {
                 100 -> refreshList()
                 101 -> {
                     val uri = data.data ?: return
-                    val inputStream = contentResolver.openInputStream(uri)
-                    val content = inputStream?.bufferedReader()?.readText() ?: ""
-                    inputStream?.close()
-                    if (content.isNotBlank()) {
-                        val fileName = "imported_${System.currentTimeMillis()}.sh"
-                        File(filesDir, "commands/$fileName").writeText(content)
+                    contentResolver.openInputStream(uri)?.use { input ->
+                        val content = input.bufferedReader().readText()
+                        if (content.isNotBlank()) {
+                            val fileName = "imported_${System.currentTimeMillis()}.sh"
+                            File(filesDir, "commands/$fileName").writeText(content)
+                        }
                     }
                     refreshList()
                 }
             }
         }
     }
-
-    }
 }
-
