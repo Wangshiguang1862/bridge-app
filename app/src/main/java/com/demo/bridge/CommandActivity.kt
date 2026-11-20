@@ -57,4 +57,3 @@ class CommandActivity : AppCompatActivity() {
     }
 }
 
-data class CommandItem(val seq: Int, val file: File)
