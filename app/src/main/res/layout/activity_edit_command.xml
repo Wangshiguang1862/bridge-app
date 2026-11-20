@@ -10,9 +10,13 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:gravity="top"
+        android:gravity="top|start"
         android:hint="输入命令内容"
-        android:inputType="textMultiLine" />
+        android:inputType="textMultiLine|textNoSuggestions"
+        android:textIsSelectable="true"
+        android:longClickable="true"
+        android:scrollbars="vertical"
+        android:textSize="14sp" />
 
     <Button
         android:id="@+id/btnSave"
