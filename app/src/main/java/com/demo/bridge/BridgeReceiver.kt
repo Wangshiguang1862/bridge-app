@@ -8,16 +8,16 @@ import android.util.Log
 
 class BridgeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d("Bridge", "onReceive hit action=${intent.action}")
         val cmd = intent.getStringExtra("cmd") ?: return
-        Log.d("Bridge", "recv cmd=$cmd")
-        val i = Intent(context, BridgeService::class.java).apply {
+        Log.d("Bridge", "receiver cmd: $cmd")
+
+        val serviceIntent = Intent(context, BridgeService::class.java).apply {
             putExtra("cmd", cmd)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(i)
+            context.startForegroundService(serviceIntent)
         } else {
-            context.startService(i)
+            context.startService(serviceIntent)
         }
     }
 }
