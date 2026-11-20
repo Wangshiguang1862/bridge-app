@@ -18,14 +18,6 @@ class BridgeService : Service() {
         private const val NOTIFY_ID_BASE = 2000
     }
 
-    private val binder = object : IBridgeApi.Stub() {
-        override fun execute(command: String?): String {
-            return if (command.isNullOrBlank()) err("empty") else doExecute(command)
-        }
-
-        override fun isReady(): Boolean = DhizukuAuth.isReady()
-    }
-
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "service onCreate")
@@ -42,7 +34,7 @@ class BridgeService : Service() {
         return START_NOT_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder = binder
+    override fun onBind(intent: Intent?): IBinder? = null
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -96,8 +88,8 @@ class BridgeService : Service() {
     }
 
     private fun doExecute(command: String): String {
-        return DhizukuAuth.run {
-            if (!DhizukuAuth.isReady()) return@run err("dhizuku not ready")
+        return try {
+            if (!DhizukuAuth.isReady()) return err("dhizuku not ready")
             val parts = command.split(":", limit = 2)
             val action = parts[0].lowercase()
             val arg = parts.getOrNull(1)?.trim().orEmpty()
@@ -111,6 +103,8 @@ class BridgeService : Service() {
                 "status" -> ok(if (DhizukuAuth.isReady()) "ready" else "not-ready")
                 else -> err("unsupported: $action")
             }
+        } catch (t: Throwable) {
+            err(t.message ?: "unknown")
         }
     }
 
