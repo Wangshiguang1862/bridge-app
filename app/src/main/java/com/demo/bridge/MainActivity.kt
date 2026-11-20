@@ -1,62 +1,54 @@
 package com.demo.bridge
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
-
-    companion object {
-        private const val REQ_NOTIFY = 1001
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                REQ_NOTIFY
-            )
-        } else {
-            requestDhizukuThenStart()
+        // 外部接口调用：带 cmd 参数
+        val cmdParam = intent.getStringExtra("cmd")
+        if (!cmdParam.isNullOrBlank()) {
+            val indices = cmdParam.split(",").mapNotNull { it.trim().toIntOrNull() }
+            if (indices.isNotEmpty()) {
+                Intent(this, BridgeService::class.java).also {
+                    it.putIntegerArrayListExtra("indices", ArrayList(indices))
+                    startService(it)
+                }
+                finish()
+                return
+            }
         }
-    }
 
-    private fun requestDhizukuThenStart() {
-        DhizukuAuth.ensurePermission(
-            activity = this,
-            onGranted = { startBridge() },
-            onDenied = { startBridge() }
-        )
-    }
-
-    private fun startBridge() {
-        val intent = Intent(this, BridgeService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
+        // 内部启动：走已选命令
+        val selected = loadSelected()
+        if (selected.isNotEmpty()) {
+            Intent(this, BridgeService::class.java).also {
+                it.putIntegerArrayListExtra("indices", ArrayList(selected))
+                startService(it)
+            }
         }
+
+        // 进管理界面
+        startActivity(Intent(this, CommandActivity::class.java))
+        finish()
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_NOTIFY) {
-            requestDhizukuThenStart()
+    private fun loadSelected(): List<Int> {
+        val file = File(filesDir, "selected.json")
+        if (!file.exists()) return emptyList()
+        return try {
+            val text = file.readText().trim()
+            if (text.startsWith("[")) {
+                text.removeSurrounding("[", "]").split(",")
+                    .mapNotNull { it.trim().toIntOrNull() }
+            } else emptyList()
+        } catch (e: Throwable) {
+            emptyList()
         }
     }
 }
