@@ -20,3 +20,6 @@ dependencyResolutionManagement {
         }
     }
 }
+
+rootProject.name = "bridge-app"
+include(":app")
