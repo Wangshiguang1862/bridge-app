@@ -9,14 +9,10 @@ class BridgeApp : Application() {
         super.onCreate()
         Log.d("Bridge", "app onCreate")
         try {
-            if (Dhizuku.isPermissionGranted()) {
-                Dhizuku.init(this)
-                Log.d("Bridge", "dhizuku init ok")
-            } else {
-                Log.d("Bridge", "dhizuku not granted")
-            }
+            Dhizuku.init(this)
+            Log.d("Bridge", "dhizuku init done")
         } catch (e: Throwable) {
-            Log.e("Bridge", "dhizuku init fail", e)
+            Log.w("Bridge", "dhizuku init failed, ignore", e)
         }
     }
 }
