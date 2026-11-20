@@ -1,21 +1,23 @@
 package com.demo.bridge
 
-import android.app.Application
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.util.Log
-import com.rosan.dhizuku.api.Dhizuku
-import com.rosan.dhizuku.api.DhizukuRequestPermissionListener
 
-class BridgeApp : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        Log.d("Bridge", "app onCreate")
-        if (Dhizuku.isPermissionGranted()) {
-            Dhizuku.init(this)
-            Log.d("Bridge", "dhizuku init ok")
-            // 实际命令下发由外部 Dhizuku 客户端调用本 App 暴露的通道；
-            // 收到命令后统一转 BridgeService.execute(cmd)
+class BridgeReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        Log.d("Bridge", "onReceive hit action=${intent.action}")
+        val cmd = intent.getStringExtra("cmd") ?: return
+        Log.d("Bridge", "recv cmd=$cmd")
+        val i = Intent(context, BridgeService::class.java).apply {
+            putExtra("cmd", cmd)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(i)
         } else {
-            Log.d("Bridge", "dhizuku not granted")
+            context.startService(i)
         }
     }
 }
