@@ -4,29 +4,31 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import androidx.core.app.NotificationCompat
+import com.rosan.dhizuku.api.Dhizuku
+import com.rosan.dhizuku.api.DhizukuRequestPermissionListener
 
 class BridgeService : Service() {
-
     companion object {
-        const val CHANNEL_ID = "bridge"
+        private const val CHANNEL_ID = "bridge_channel"
+        private const val NOTIFY_ID = 1
     }
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("Bridge", "service onCreate")
         createChannel()
-        startForeground(1, buildNotification())
+        startForeground(NOTIFY_ID, buildNotification())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val cmd = intent?.getStringExtra("cmd")
-        Log.d("Bridge", "service cmd=$cmd")
-        if (!cmd.isNullOrBlank()) execute(cmd)
+        if (!cmd.isNullOrBlank()) {
+            execute(cmd)
+        }
         return START_STICKY
     }
 
@@ -34,36 +36,44 @@ class BridgeService : Service() {
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = getSystemService(NotificationManager::class.java)
-            if (nm.getNotificationChannel(CHANNEL_ID) == null) {
-                nm.createNotificationChannel(
-                    NotificationChannel(
-                        CHANNEL_ID,
-                        "Bridge",
-                        NotificationManager.IMPORTANCE_LOW
-                    )
-                )
-            }
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Bridge Service",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            getSystemService(NotificationManager::class.java)
+                .createNotificationChannel(channel)
         }
     }
 
     private fun buildNotification(): Notification {
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Bridge running")
-            .setOngoing(true)
-            .build()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+                .setContentTitle("Bridge Running")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+                .setContentTitle("Bridge Running")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .build()
+        }
     }
 
     private fun execute(cmd: String) {
+        Log.d("Bridge", "execute cmd: $cmd")
+        if (!Dhizuku.isPermissionGranted()) {
+            Log.w("Bridge", "dhizuku not granted, skip")
+            return
+        }
         try {
-            val p = Runtime.getRuntime().exec(arrayOf("/system/bin/sh", "-c", cmd))
-            val out = p.inputStream.bufferedReader().readText()
-            val err = p.errorStream.bufferedReader().readText()
-            p.waitFor()
-            Log.d("Bridge", "exit=${p.exitValue()} out=$out err=$err")
-        } catch (e: Exception) {
-            Log.e("Bridge", "exec error", e)
+            // 示例：通过 Dhizuku 执行 shell（按实际业务替换）
+            val result = Dhizuku.getRemoteBinder()
+            Log.d("Bridge", "remote binder: $result")
+            // TODO: 把 cmd 映射为具体 Dhizuku DeviceOwner API 调用
+        } catch (e: Throwable) {
+            Log.e("Bridge", "execute fail", e)
         }
     }
 }
