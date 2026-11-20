@@ -1,22 +1,21 @@
 package com.demo.bridge
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.app.NotificationManager
-import androidx.core.app.NotificationCompat
+import android.app.Application
+import android.util.Log
+import com.rosan.dhizuku.api.Dhizuku
+import com.rosan.dhizuku.api.DhizukuRequestPermissionListener
 
-class BridgeReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != "com.demo.bridge.RUN_COMMAND") return
-        val cmd = intent.getStringExtra("cmd") ?: "empty"
-        val notification = NotificationCompat.Builder(context, "bridge")
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Bridge Command")
-            .setContentText(cmd)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        context.getSystemService(NotificationManager::class.java)
-            .notify(1, notification)
+class BridgeApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        Log.d("Bridge", "app onCreate")
+        if (Dhizuku.isPermissionGranted()) {
+            Dhizuku.init(this)
+            Log.d("Bridge", "dhizuku init ok")
+            // 实际命令下发由外部 Dhizuku 客户端调用本 App 暴露的通道；
+            // 收到命令后统一转 BridgeService.execute(cmd)
+        } else {
+            Log.d("Bridge", "dhizuku not granted")
+        }
     }
 }
