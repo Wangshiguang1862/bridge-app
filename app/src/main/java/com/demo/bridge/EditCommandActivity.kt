@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
 class EditCommandActivity : AppCompatActivity() {
+
     private lateinit var etContent: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,11 +28,11 @@ class EditCommandActivity : AppCompatActivity() {
 
         btnSave.setOnClickListener {
             if (path == null) {
-                Toast(this, "路径为空", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "路径为空", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             File(path).writeText(etContent.text.toString())
-            Toast(this, "已保存", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show()
             finish()
         }
     }
