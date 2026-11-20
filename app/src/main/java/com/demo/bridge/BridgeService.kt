@@ -4,76 +4,137 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import com.rosan.dhizuku.api.Dhizuku
-import com.rosan.dhizuku.api.DhizukuRequestPermissionListener
+import java.io.File
 
 class BridgeService : Service() {
+
     companion object {
-        private const val CHANNEL_ID = "bridge_channel"
-        private const val NOTIFY_ID = 1
+        private const val TAG = "Bridge"
+        private const val CHANNEL_ID = "bridge_result"
+        private const val NOTIFY_ID_BASE = 2000
+    }
+
+    private val binder = object : IBridgeApi.Stub() {
+        override fun execute(command: String?): String {
+            return if (command.isNullOrBlank()) err("empty") else doExecute(command)
+        }
+
+        override fun isReady(): Boolean = DhizukuAuth.isReady()
     }
 
     override fun onCreate() {
         super.onCreate()
+        Log.d(TAG, "service onCreate")
         createChannel()
-        startForeground(NOTIFY_ID, buildNotification())
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val cmd = intent?.getStringExtra("cmd")
-        if (!cmd.isNullOrBlank()) {
-            execute(cmd)
+        Log.d(TAG, "onStartCommand")
+        val indices = intent?.getIntegerArrayListExtra("indices")
+        if (!indices.isNullOrEmpty()) {
+            executeByIndices(indices)
         }
-        return START_STICKY
+        stopSelf(startId)
+        return START_NOT_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder? = null
+    override fun onBind(intent: Intent?): IBinder = binder
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Bridge Service",
-                NotificationManager.IMPORTANCE_LOW
+                "Bridge 执行结果",
+                NotificationManager.IMPORTANCE_DEFAULT
             )
-            getSystemService(NotificationManager::class.java)
-                .createNotificationChannel(channel)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
         }
     }
 
-    private fun buildNotification(): Notification {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    private fun executeByIndices(indices: List<Int>) {
+        val dir = File(filesDir, "commands")
+        if (!dir.exists() || !dir.isDirectory) {
+            notifyResult("Bridge", "命令目录不存在")
+            return
+        }
+
+        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".sh") }
+            ?.sortedBy { it.name } ?: emptyArray()
+
+        if (files.isEmpty()) {
+            notifyResult("Bridge", "无可用命令")
+            return
+        }
+
+        val results = mutableListOf<String>()
+        indices.forEach { idx ->
+            if (idx < 1 || idx > files.size) {
+                results.add("序号$idx: 不存在")
+                return@forEach
+            }
+            val file = files[idx - 1]
+            val command = file.readText().trim()
+            if (command.isEmpty()) {
+                results.add("${file.nameWithoutExtension}: 空命令")
+                return@forEach
+            }
+            val result = doExecute(command)
+            val name = file.nameWithoutExtension
+            if (result.contains("\"ok\":true")) {
+                results.add("$name: 成功")
+            } else {
+                val reason = result.substringAfter("\"err\":\"", "失败").trimEnd('"')
+                results.add("$name: 失败($reason)")
+            }
+        }
+
+        notifyResult("Bridge 执行完成", results.joinToString(" | "))
+    }
+
+    private fun doExecute(command: String): String {
+        return DhizukuAuth.run {
+            if (!DhizukuAuth.isReady()) return@run err("dhizuku not ready")
+            val parts = command.split(":", limit = 2)
+            val action = parts[0].lowercase()
+            val arg = parts.getOrNull(1)?.trim().orEmpty()
+            when (action) {
+                "install" -> ok("reserved:install:$arg")
+                "uninstall" -> ok("reserved:uninstall:$arg")
+                "shell" -> ok("reserved:shell:$arg")
+                "setting" -> ok("reserved:setting:$arg")
+                "app" -> ok("reserved:app:$arg")
+                "ping" -> ok("pong")
+                "status" -> ok(if (DhizukuAuth.isReady()) "ready" else "not-ready")
+                else -> err("unsupported: $action")
+            }
+        }
+    }
+
+    private fun notifyResult(title: String, content: String) {
+        val nm = getSystemService(NotificationManager::class.java)
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle("Bridge Running")
+                .setContentTitle(title)
+                .setContentText(content)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setAutoCancel(true)
                 .build()
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setContentTitle("Bridge Running")
+                .setContentTitle(title)
+                .setContentText(content)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setAutoCancel(true)
                 .build()
         }
+        nm.notify(NOTIFY_ID_BASE + System.currentTimeMillis().toInt(), notification)
     }
 
-    private fun execute(cmd: String) {
-        Log.d("Bridge", "execute cmd: $cmd")
-        if (!Dhizuku.isPermissionGranted()) {
-            Log.w("Bridge", "dhizuku not granted, skip")
-            return
-        }
-        try {
-            // 示例：通过 Dhizuku 执行 shell（按实际业务替换）
-            val result = Dhizuku.getRemoteBinder()
-            Log.d("Bridge", "remote binder: $result")
-            // TODO: 把 cmd 映射为具体 Dhizuku DeviceOwner API 调用
-        } catch (e: Throwable) {
-            Log.e("Bridge", "execute fail", e)
-        }
-    }
+    private fun ok(data: String) = """{"ok":true,"data":"$data"}"""
+    private fun err(msg: String) = """{"ok":false,"err":"$msg"}"""
 }
