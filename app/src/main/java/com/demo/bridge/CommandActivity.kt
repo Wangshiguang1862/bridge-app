@@ -48,12 +48,26 @@ class CommandActivity : AppCompatActivity() {
         }
         startActivityForResult(Intent.createChooser(intent, "导入命令"), 101)
     }
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode == Activity.RESULT_OK) {
-            refreshList()
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            when (requestCode) {
+                100 -> refreshList()
+                101 -> {
+                    val uri = data.data ?: return
+                    val inputStream = contentResolver.openInputStream(uri)
+                    val content = inputStream?.bufferedReader()?.readText() ?: ""
+                    inputStream?.close()
+                    if (content.isNotBlank()) {
+                        val fileName = "imported_${System.currentTimeMillis()}.sh"
+                        File(filesDir, "commands/$fileName").writeText(content)
+                    }
+                    refreshList()
+                }
+            }
         }
+    }
+
     }
 }
 
