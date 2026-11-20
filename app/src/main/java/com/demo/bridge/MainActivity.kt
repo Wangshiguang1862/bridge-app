@@ -1,47 +1,39 @@
 package com.demo.bridge
 
-import android.app.Activity
-import android.app.NotificationChannel
-import android.app.NotificationManager
+import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        createChannel()
-        requestNotifyPermissionIfNeeded()
 
-        val tv = TextView(this).apply {
-            text = "BridgeApp OK"
-            textSize = 24f
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    1001
+                )
+            }
         }
-        setContentView(tv)
-    }
 
-    private fun createChannel() {
+        val intent = Intent(this, BridgeService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "bridge",
-                "Bridge",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            getSystemService(NotificationManager::class.java)
-                .createNotificationChannel(channel)
+            startForegroundService(intent)
+        } else {
+            startService(intent)
         }
-    }
 
-    private fun requestNotifyPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-            != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(
-                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                1
-            )
-        }
+        finish()
     }
 }
