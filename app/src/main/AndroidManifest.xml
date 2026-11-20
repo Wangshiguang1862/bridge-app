@@ -4,7 +4,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
         android:name=".BridgeApp"
@@ -20,15 +19,19 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="com.demo.bridge.EXECUTE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
         </activity>
 
-        <receiver
-            android:name=".BridgeReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.demo.bridge.RUN_COMMAND"/>
-            </intent-filter>
-        </receiver>
+        <activity
+            android:name=".CommandActivity"
+            android:exported="false"/>
+
+        <activity
+            android:name=".EditCommandActivity"
+            android:exported="false"/>
 
         <service
             android:name=".BridgeService"
@@ -38,6 +41,5 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="bridge_command_executor"/>
         </service>
-
     </application>
 </manifest>
