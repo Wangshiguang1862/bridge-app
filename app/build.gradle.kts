@@ -9,16 +9,10 @@ android {
 
     defaultConfig {
         applicationId = "com.demo.bridge"
-        minSdk = 23
+        minSdk = 21
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-        }
     }
 
     compileOptions {
@@ -29,11 +23,4 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    buildFeatures {
-        buildConfig = true
-    }
-}
-
-dependencies {
 }
