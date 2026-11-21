@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import rikka.shizuku.Shizuku
@@ -16,20 +15,21 @@ class MainActivity : Activity() {
     private lateinit var authButton: Button
     private lateinit var execButton: Button
     private lateinit var commandInput: TextView
-    private lateinit var outputScroll: ScrollView
     private lateinit var outputText: TextView
 
     private val REQUEST_CODE = 1001
 
     private val permissionListener = object : Shizuku.OnRequestPermissionResultListener {
         override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
-            if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                updateStatus("Shizuku 已授权")
-                authButton.isEnabled = false
-                execButton.isEnabled = true
-            } else {
-                updateStatus("Shizuku 授权被拒绝")
-                Toast.makeText(this@MainActivity, "授权被拒绝，将使用降级模式", Toast.LENGTH_SHORT).show()
+            runOnUiThread {
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    statusText.text = "状态: Shizuku 已授权"
+                    authButton.isEnabled = false
+                    execButton.isEnabled = true
+                } else {
+                    statusText.text = "状态: Shizuku 授权被拒绝"
+                    Toast.makeText(this@MainActivity, "授权被拒绝", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -43,7 +43,7 @@ class MainActivity : Activity() {
         }
 
         statusText = TextView(this).apply {
-            text = "正在检测 Shizuku..."
+            text = "状态: 检测中..."
             textSize = 18f
         }
 
@@ -63,30 +63,28 @@ class MainActivity : Activity() {
             isEnabled = false
         }
 
-        outputScroll = ScrollView(this)
         outputText = TextView(this).apply {
             text = "等待执行..."
             textSize = 14f
             setPadding(0, 24, 0, 0)
         }
-        outputScroll.addView(outputText)
 
         root.addView(statusText)
         root.addView(authButton)
         root.addView(commandInput)
         root.addView(execButton)
-        root.addView(outputScroll)
+        root.addView(outputText)
         setContentView(root)
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
         authButton.setOnClickListener {
-            if (!Shizuku.pingBinder()) {
-                updateStatus("Shizuku 未运行，请先启动 Shizuku")
+            if (!isShizukuReady()) {
+                Toast.makeText(this, "Shizuku 未就绪", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-                updateStatus("Shizuku 已授权")
+                statusText.text = "状态: Shizuku 已授权"
                 execButton.isEnabled = true
                 authButton.isEnabled = false
             } else {
@@ -95,6 +93,10 @@ class MainActivity : Activity() {
         }
 
         execButton.setOnClickListener {
+            if (!isShizukuReady()) {
+                outputText.text = "Shizuku 未就绪，无法执行"
+                return@setOnClickListener
+            }
             val cmd = commandInput.text.toString().trim()
             if (cmd.isEmpty()) {
                 outputText.text = "命令不能为空"
@@ -106,19 +108,27 @@ class MainActivity : Activity() {
         checkShizukuStatus()
     }
 
+    private fun isShizukuReady(): Boolean {
+        return try {
+            Shizuku.pingBinder()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun checkShizukuStatus() {
-        if (!Shizuku.pingBinder()) {
-            updateStatus("Shizuku 未安装或未启动")
+        if (!isShizukuReady()) {
+            statusText.text = "状态: Shizuku 未安装或未启动"
             authButton.isEnabled = false
             execButton.isEnabled = false
             return
         }
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-            updateStatus("Shizuku 已授权")
+            statusText.text = "状态: Shizuku 已授权"
             authButton.isEnabled = false
             execButton.isEnabled = true
         } else {
-            updateStatus("Shizuku 已安装，未授权")
+            statusText.text = "状态: Shizuku 已安装，未授权"
             authButton.isEnabled = true
             execButton.isEnabled = false
         }
@@ -126,7 +136,6 @@ class MainActivity : Activity() {
 
     private fun executeCommand(command: String) {
         try {
-            // 通过 Shizuku 的 shell 执行命令
             val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
             val result = process.inputStream.bufferedReader().readText()
             val error = process.errorStream.bufferedReader().readText()
@@ -142,12 +151,12 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun updateStatus(text: String) {
-        statusText.text = "状态: $text"
-    }
-
     override fun onDestroy() {
         super.onDestroy()
-        Shizuku.removeRequestPermissionResultListener(permissionListener)
+        try {
+            Shizuku.removeRequestPermissionResultListener(permissionListener)
+        } catch (e: Exception) {
+            // ignore
+        }
     }
 }
