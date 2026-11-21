@@ -36,5 +36,5 @@ android {
 }
 
 dependencies {
-    implementation("com.github.iamr0s:Dhizuku:2.13.0")
+#    implementation("com.github.iamr0s:Dhizuku:2.13.0")
 }
