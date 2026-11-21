@@ -1,18 +1,10 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+package com.demo.bridge
 
-    <application
-        android:allowBackup="true"
-        android:label="Bridge"
-        android:theme="@android:style/Theme.Material.Light">
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
+import android.os.Bundle
+import androidx.appcompat.app.AppCompatActivity
 
-</manifest>
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+    }
+}
