@@ -1,51 +1,23 @@
 package com.demo.bridge
 
-import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import java.io.File
 
 class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val cmdParam = intent.getStringExtra("cmd")
-        if (!cmdParam.isNullOrBlank()) {
-            val indices = cmdParam.split(",").mapNotNull { it.trim().toIntOrNull() }
-            if (indices.isNotEmpty()) {
-                Intent(this, BridgeService::class.java).also {
-                    it.putIntegerArrayListExtra("indices", ArrayList(indices))
-                    startService(it)
-                }
-                finish()
-                return
-            }
-        }
+        // 示例：filesDir 只能在 Activity/Context 里用
+        val dir = filesDir.absolutePath
 
-        val selected = loadSelected()
-        if (selected.isNotEmpty()) {
-            Intent(this, BridgeService::class.java).also {
-                it.putIntegerArrayListExtra("indices", ArrayList(selected))
-                startService(it)
-            }
-        }
+        // 示例：finish() 只能在 Activity 里用
+        // finish()
 
-        startActivity(Intent(this, CommandActivity::class.java))
-        finish()
-    }
-
-    private fun loadSelected(): List<Int> {
-        val file = File(filesDir, "selected.json")
-        if (!file.exists()) return emptyList()
-        return try {
-            val text = file.readText().trim()
-            if (text.startsWith("[")) {
-                text.removeSurrounding("[", "]").split(",")
-                    .mapNotNull { it.trim().toIntOrNull() }
-            } else emptyList()
-        } catch (e: Throwable) {
-            emptyList()
+        // 示例：lambda 显式写参数，避免 it 推断失败
+        listOf("a", "b").forEach { item ->
+            Toast.makeText(this, item, Toast.LENGTH_SHORT).show()
         }
     }
 }
