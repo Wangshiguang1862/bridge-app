@@ -33,19 +33,7 @@ android {
     buildFeatures {
         buildConfig = true
     }
-    sourceSets {
-        getByName("main") {
-            java.exclude("**/DhizukuAuth.kt")
-            java.exclude("**/BridgeService*")
-            java.exclude("**/BridgeReceiver*")
-            java.exclude("**/CommandAct*")
-            java.exclude("**/CommandAd*")
-            java.exclude("**/CommandIt*")
-            java.exclude("**/EditComman*")
-        }
-    }
 }
 
 dependencies {
-    // Dhizuku 依赖已移除，源码中对应调用需一并注释或改为空实现
 }
