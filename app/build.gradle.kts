@@ -33,6 +33,17 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    sourceSets {
+        getByName("main") {
+            java.exclude("**/DhizukuAuth.kt")
+            java.exclude("**/BridgeService*")
+            java.exclude("**/BridgeReceiver*")
+            java.exclude("**/CommandAct*")
+            java.exclude("**/CommandAd*")
+            java.exclude("**/CommandIt*")
+            java.exclude("**/EditComman*")
+        }
+    }
 }
 
 dependencies {
