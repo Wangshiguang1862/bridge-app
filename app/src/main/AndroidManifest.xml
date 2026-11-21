@@ -1,22 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Shizuku API 权限 -->
     <uses-permission android:name="moe.shizuku.manager.permission.API"/>
 
     <application
         android:allowBackup="true"
         android:label="Bridge"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!-- Shizuku Provider，必须放 application 里面 -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:multiprocess="false"
             android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
+            android:exported="true" />
 
         <activity
             android:name=".MainActivity"
@@ -26,6 +23,7 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
     </application>
 
 </manifest>
