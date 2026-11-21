@@ -4,7 +4,9 @@ import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import rikka.shizuku.Shizuku
@@ -13,9 +15,10 @@ class MainActivity : Activity() {
 
     private lateinit var statusText: TextView
     private lateinit var authButton: Button
+    private lateinit var commandInput: EditText
     private lateinit var execButton: Button
-    private lateinit var commandInput: TextView
     private lateinit var outputText: TextView
+    private lateinit var outputScroll: ScrollView
 
     private val REQUEST_CODE = 1001
 
@@ -52,8 +55,8 @@ class MainActivity : Activity() {
             isEnabled = false
         }
 
-        commandInput = TextView(this).apply {
-            text = "pm list packages"
+        commandInput = EditText(this).apply {
+            setText("pm list packages")
             textSize = 16f
             setPadding(0, 24, 0, 0)
         }
@@ -66,14 +69,22 @@ class MainActivity : Activity() {
         outputText = TextView(this).apply {
             text = "等待执行..."
             textSize = 14f
-            setPadding(0, 24, 0, 0)
+        }
+
+        outputScroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            addView(outputText)
         }
 
         root.addView(statusText)
         root.addView(authButton)
         root.addView(commandInput)
         root.addView(execButton)
-        root.addView(outputText)
+        root.addView(outputScroll)
         setContentView(root)
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
@@ -93,10 +104,6 @@ class MainActivity : Activity() {
         }
 
         execButton.setOnClickListener {
-            if (!isShizukuReady()) {
-                outputText.text = "Shizuku 未就绪，无法执行"
-                return@setOnClickListener
-            }
             val cmd = commandInput.text.toString().trim()
             if (cmd.isEmpty()) {
                 outputText.text = "命令不能为空"
@@ -135,19 +142,28 @@ class MainActivity : Activity() {
     }
 
     private fun executeCommand(command: String) {
+        if (!isShizukuReady() || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+            outputText.text = "Shizuku 未就绪或未授权"
+            return
+        }
         try {
-            val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
-            val result = process.inputStream.bufferedReader().readText()
-            val error = process.errorStream.bufferedReader().readText()
-            process.waitFor()
+            val remoteProcess = Shizuku.newProcess(
+                arrayOf("sh", "-c", command),
+                null,
+                null
+            )
+            val result = remoteProcess.inputStream.bufferedReader().readText()
+            val error = remoteProcess.errorStream.bufferedReader().readText()
+            remoteProcess.waitFor()
 
             val output = buildString {
                 if (result.isNotBlank()) append(result)
                 if (error.isNotBlank()) append("\n错误:\n$error")
             }
-            outputText.text = output.ifBlank { "命令执行完成，无输出" }
+            outputText.text = output.ifBlank { "执行完成，无输出" }
+            outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
         } catch (e: Exception) {
-            outputText.text = "执行失败: ${e.message}"
+            outputText.text = "Shizuku 执行失败: ${e.message}"
         }
     }
 
