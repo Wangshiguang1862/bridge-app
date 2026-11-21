@@ -36,5 +36,5 @@ android {
 }
 
 dependencies {
-#    implementation("com.github.iamr0s:Dhizuku:2.13.0")
+    // Dhizuku 依赖已移除，源码中对应调用需一并注释或改为空实现
 }
