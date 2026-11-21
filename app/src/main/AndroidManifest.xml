@@ -3,10 +3,9 @@
 
     <application
         android:allowBackup="true"
-        android:icon="@android:drawable/ic_dialog_info"
         android:label="Bridge"
-        android:theme="@android:style/Theme.Material.Light">
-
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Bridge">
         <activity
             android:name=".MainActivity"
             android:exported="true">
