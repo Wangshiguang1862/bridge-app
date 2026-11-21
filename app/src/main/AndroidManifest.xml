@@ -4,8 +4,7 @@
     <application
         android:allowBackup="true"
         android:label="Bridge"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.Bridge">
+        android:theme="@android:style/Theme.Material.Light">
         <activity
             android:name=".MainActivity"
             android:exported="true">
