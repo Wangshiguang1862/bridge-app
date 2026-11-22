@@ -1,16 +1,15 @@
 package com.demo.bridge
 
+import android.app.Activity
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private lateinit var statusText: TextView
     private lateinit var authButton: Button
@@ -19,14 +18,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var outputText: TextView
     private lateinit var outputScroll: ScrollView
 
-    private val mainHandler = Handler(Looper.getMainLooper())
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 纯代码布局，不依赖 xml
-        val root = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)
         }
 
@@ -34,10 +30,8 @@ class MainActivity : AppCompatActivity() {
         authButton = Button(this).apply { text = "请求 Shizuku 授权" }
         commandInput = EditText(this).apply { hint = "输入命令，如 pm list packages" }
         execButton = Button(this).apply { text = "执行" }
-        outputText = TextView(this).apply { setTextIsSelectable(true) }
-        outputScroll = ScrollView(this).apply {
-            addView(outputText)
-        }
+        outputText = TextView(this).apply { isTextSelectable = true }
+        outputScroll = ScrollView(this).apply { addView(outputText) }
 
         root.addView(statusText)
         root.addView(authButton)
