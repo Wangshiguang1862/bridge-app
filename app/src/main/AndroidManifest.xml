@@ -19,8 +19,8 @@
             android:exported="true"
             android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
 
-        <activity
-            <activity android:name=".EditCommandActivity" android:exported="false" />
+            <activity
+            android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -28,7 +28,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".EditCommandActivity" />
+        <activity android:name=".EditCommandActivity" android:exported="false" />
     </application>
 
 </manifest>
