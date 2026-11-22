@@ -7,8 +7,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.BaseAdapter
-import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
@@ -27,7 +27,9 @@ data class CommandItem(
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var statusText: TextView
     private lateinit var listView: ListView
+    private lateinit var btnAdd: ImageButton
     private lateinit var adapter: CommandAdapter
     private val items = mutableListOf<CommandItem>()
 
@@ -38,14 +40,16 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_command)
 
+        statusText = findViewById(R.id.statusText)
         listView = findViewById(R.id.listView)
+        btnAdd = findViewById(R.id.btnAdd)
+
         adapter = CommandAdapter()
         listView.adapter = adapter
 
         loadData()
 
-        findViewById<Button>(R.id.btnAdd).setOnClickListener { showEditDialog(null) }
-        findViewById<Button>(R.id.btnNote).setOnClickListener { showAddNoteDialog() }
+        btnAdd.setOnClickListener { showEditDialog(null) }
 
         listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, pos, _ ->
             showEditDialog(items[pos])
@@ -100,56 +104,46 @@ class MainActivity : AppCompatActivity() {
 
     private fun showEditDialog(item: CommandItem?) {
         val view = LayoutInflater.from(this).inflate(R.layout.activity_edit_command, null)
-        val etName = view.findViewById<EditText>(R.id.etName)
-        val etPkg = view.findViewById<EditText>(R.id.etPkg)
-        val etAction = view.findViewById<EditText>(R.id.etAction)
+        val etContent = view.findViewById<EditText>(R.id.etContent)
 
         if (item != null) {
-            etName.setText(item.name)
-            etPkg.setText(item.pkg)
-            etAction.setText(item.action)
+            etContent.setText(buildString {
+                append(item.name)
+                append('\n').append(item.pkg)
+                append('\n').append(item.action)
+            })
         }
 
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(if (item == null) "添加命令" else "编辑命令")
             .setView(view)
-            .setPositiveButton("保存") { _, _ ->
-                val name = etName.text.toString().trim()
-                val pkg = etPkg.text.toString().trim()
-                val action = etAction.text.toString().trim()
-                if (name.isEmpty() || pkg.isEmpty()) {
-                    Toast.makeText(this, "名称和包名不能为空", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                if (item == null) {
-                    items.add(CommandItem(name = name, pkg = pkg, action = action))
-                } else {
-                    item.name = name
-                    item.pkg = pkg
-                    item.action = action
-                }
-                saveData()
-                refreshList()
-            }
             .setNegativeButton("取消", null)
-            .show()
-    }
+            .create()
 
-    private fun showAddNoteDialog() {
-        val et = EditText(this)
-        et.hint = "备注内容"
-        AlertDialog.Builder(this)
-            .setTitle("添加备注")
-            .setView(et)
-            .setPositiveButton("保存") { _, _ ->
-                val text = et.text.toString().trim()
-                if (text.isEmpty()) return@setPositiveButton
-                items.add(CommandItem(name = "备注", pkg = "", note = text))
-                saveData()
-                refreshList()
+        view.findViewById<android.widget.Button>(R.id.btnSave).setOnClickListener {
+            val text = etContent.text.toString().trim()
+            if (text.isEmpty()) {
+                Toast.makeText(this, "内容不能为空", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
-            .setNegativeButton("取消", null)
-            .show()
+            val lines = text.lines().map { it.trim() }
+            val name = lines.getOrNull(0) ?: ""
+            val pkg = lines.getOrNull(1) ?: ""
+            val action = lines.getOrNull(2) ?: ""
+
+            if (item == null) {
+                items.add(CommandItem(name = name, pkg = pkg, action = action))
+            } else {
+                item.name = name
+                item.pkg = pkg
+                item.action = action
+            }
+            saveData()
+            refreshList()
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun showItemMenu(item: CommandItem, pos: Int) {
@@ -180,7 +174,7 @@ class MainActivity : AppCompatActivity() {
         override fun getItemId(position: Int): Long = items[position].id
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
-            val v = convertView ?: LayoutInflater.from(context)
+            val v = convertView ?: LayoutInflater.from(this@MainActivity)
                 .inflate(R.layout.item_command, parent, false)
             val tv = v.findViewById<TextView>(R.id.text)
             val it = items[position]
