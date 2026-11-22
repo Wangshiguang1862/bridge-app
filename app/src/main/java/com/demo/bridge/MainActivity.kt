@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ListView
@@ -26,7 +27,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: CommandAdapter
 
     private val commands = mutableListOf<String>()
-    private val notes = mutableMapOf<Int, String>()
+    private val notes = mutableMapOf<String, String>()
 
     private var selectedIndex = -1
     private val requestCode = 1001
@@ -49,7 +50,9 @@ class MainActivity : AppCompatActivity() {
         listView.adapter = adapter
 
         btnAdd.setOnClickListener {
-            commands.add("命令 ${commands.size + 1}")
+            val newCmd = "命令 ${commands.size + 1}"
+            commands.add(newCmd)
+            notes[newCmd] = ""
             adapter.notifyDataSetChanged()
             Toast.makeText(this, "已添加", Toast.LENGTH_SHORT).show()
         }
@@ -67,7 +70,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun displayList(): List<String> = commands.mapIndexed { index, cmd ->
-        val note = notes[index]
+        val note = notes[cmd]
         if (!note.isNullOrBlank()) {
             "${index + 1}：${cmd}\n备注：$note"
         } else {
@@ -79,17 +82,18 @@ class MainActivity : AppCompatActivity() {
     private fun showActionMenu(position: Int) {
         if (position !in commands.indices) return
         selectedIndex = position
+        val cmd = commands[position]
         val items = arrayOf("编辑", "导入导出", "运行", "删除")
         AlertDialog.Builder(this)
             .setTitle("命令 ${position + 1}")
             .setItems(items) { _: DialogInterface, which: Int ->
                 when (which) {
-                    0 -> showNoteDialog(position)
+                    0 -> showNoteDialog(cmd)
                     1 -> Toast.makeText(this, "导入 / 导出待接入", Toast.LENGTH_SHORT).show()
                     2 -> Toast.makeText(this, "运行功能待接入", Toast.LENGTH_SHORT).show()
                     3 -> {
                         commands.removeAt(position)
-                        notes.clear()
+                        notes.remove(cmd)
                         selectedIndex = -1
                         adapter.notifyDataSetChanged()
                         Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
@@ -100,14 +104,14 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showNoteDialog(index: Int) {
+    private fun showNoteDialog(cmd: String) {
         val input = EditText(this)
-        input.setText(notes[index] ?: "")
+        input.setText(notes[cmd] ?: "")
         AlertDialog.Builder(this)
             .setTitle("编辑备注")
             .setView(input)
             .setPositiveButton("保存") { _: DialogInterface, _: Int ->
-                notes[index] = input.text.toString().trim()
+                notes[cmd] = input.text.toString().trim()
                 adapter.notifyDataSetChanged()
             }
             .setNegativeButton("取消") { dialog: DialogInterface, _: Int ->
@@ -141,12 +145,17 @@ class MainActivity : AppCompatActivity() {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val view = convertView ?: inflater.inflate(R.layout.item_command, parent, false)
-            val text = view.findViewById<TextView>(R.id.itemText)
-            val more = view.findViewById<ImageButton>(R.id.itemMore)
-            text.text = displayList()[position]
-            more.setOnClickListener {
-                showActionMenu(position)
-            }
+            val tvSeq = view.findViewById<TextView>(R.id.tvSeq)
+            val tvName = view.findViewById<TextView>(R.id.tvName)
+            val cbEnable = view.findViewById<CheckBox>(R.id.cbEnable)
+
+            val cmd = commands[position]
+            tvSeq.text = (position + 1).toString()
+            tvName.text = (notes[cmd]?.takeIf { it.isNotBlank() } ?: cmd).take(20)
+            cbEnable.setOnCheckedChangeListener(null)
+            cbEnable.isChecked = true
+
+            view.setOnClickListener { showActionMenu(position) }
             return view
         }
     }
