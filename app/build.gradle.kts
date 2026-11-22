@@ -40,6 +40,6 @@ android {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     // Dhizuku 全部注释，本节不接
-    // implementation("com.github.iamr0s:DhizukuAPI:2.13.0")
+    // implementation("com.github.iamr0s:Dhizuku-API:x.x.x")
 }
 
