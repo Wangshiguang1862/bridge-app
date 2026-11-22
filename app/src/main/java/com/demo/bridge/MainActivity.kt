@@ -1,35 +1,40 @@
 package com.demo.bridge
 
-import android.app.Activity
+import android.Manifest
 import android.app.AlertDialog
 import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
-import android.widget.AdapterView
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
-import android.widget.Button
+import android.widget.BaseAdapter
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import rikka.shizuku.Shizuku
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
-    private lateinit var adapter: ArrayAdapter<String>
+    private lateinit var listView: ListView
+    private lateinit var adapter: CommandAdapter
+
     private val commands = mutableListOf<String>()
     private val notes = mutableMapOf<Int, String>()
+
     private var selectedIndex = -1
     private val requestCode = 1001
 
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
         val granted = grantResult == PackageManager.PERMISSION_GRANTED
         refreshStatus(granted)
-        if (!granted) {
-            Toast.makeText(this, "Shizuku 未授权", Toast.LENGTH_SHORT).show()
-        }
+        if (!granted) Toast.makeText(this, "Shizuku 未授权", Toast.LENGTH_SHORT).show()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,61 +42,16 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_command)
 
         statusText = findViewById(R.id.statusText)
-        val btnNew = findViewById<Button>(R.id.btnNew)
-        val btnEdit = findViewById<Button>(R.id.btnEdit)
-        val btnImportExport = findViewById<Button>(R.id.btnImportExport)
-        val btnRun = findViewById<Button>(R.id.btnRun)
-        val btnDelete = findViewById<Button>(R.id.btnDelete)
-        val listView = findViewById<ListView>(R.id.listView)
+        listView = findViewById(R.id.listView)
+        val btnAdd = findViewById<ImageButton>(R.id.btnAdd)
 
-        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, displayList())
+        adapter = CommandAdapter()
         listView.adapter = adapter
 
-        listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-            selectedIndex = position
-            Toast.makeText(this, "已选择命令 ${position + 1}", Toast.LENGTH_SHORT).show()
-        }
-
-        btnNew.setOnClickListener {
+        btnAdd.setOnClickListener {
             commands.add("命令 ${commands.size + 1}")
-            adapter.clear()
-            adapter.addAll(displayList())
             adapter.notifyDataSetChanged()
             Toast.makeText(this, "已添加", Toast.LENGTH_SHORT).show()
-        }
-
-        btnEdit.setOnClickListener {
-            if (selectedIndex !in commands.indices) {
-                Toast.makeText(this, "请先选择命令", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            showNoteDialog(selectedIndex)
-        }
-
-        btnImportExport.setOnClickListener {
-            Toast.makeText(this, "导入 / 导出待接入", Toast.LENGTH_SHORT).show()
-        }
-
-        btnRun.setOnClickListener {
-            if (selectedIndex !in commands.indices) {
-                Toast.makeText(this, "请先选择命令", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            Toast.makeText(this, "运行功能待接入", Toast.LENGTH_SHORT).show()
-        }
-
-        btnDelete.setOnClickListener {
-            if (selectedIndex !in commands.indices) {
-                Toast.makeText(this, "请先选择命令", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            commands.removeAt(selectedIndex)
-            notes.clear()
-            selectedIndex = -1
-            adapter.clear()
-            adapter.addAll(displayList())
-            adapter.notifyDataSetChanged()
-            Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
         }
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
@@ -116,6 +76,30 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun showActionMenu(position: Int) {
+        if (position !in commands.indices) return
+        selectedIndex = position
+        val items = arrayOf("编辑", "导入导出", "运行", "删除")
+        AlertDialog.Builder(this)
+            .setTitle("命令 ${position + 1}")
+            .setItems(items) { _: DialogInterface, which: Int ->
+                when (which) {
+                    0 -> showNoteDialog(position)
+                    1 -> Toast.makeText(this, "导入 / 导出待接入", Toast.LENGTH_SHORT).show()
+                    2 -> Toast.makeText(this, "运行功能待接入", Toast.LENGTH_SHORT).show()
+                    3 -> {
+                        commands.removeAt(position)
+                        notes.clear()
+                        selectedIndex = -1
+                        adapter.notifyDataSetChanged()
+                        Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     private fun showNoteDialog(index: Int) {
         val input = EditText(this)
         input.setText(notes[index] ?: "")
@@ -124,8 +108,6 @@ class MainActivity : Activity() {
             .setView(input)
             .setPositiveButton("保存") { _: DialogInterface, _: Int ->
                 notes[index] = input.text.toString().trim()
-                adapter.clear()
-                adapter.addAll(displayList())
                 adapter.notifyDataSetChanged()
             }
             .setNegativeButton("取消") { dialog: DialogInterface, _: Int ->
@@ -140,11 +122,32 @@ class MainActivity : Activity() {
 
     private fun setStatus(granted: Boolean, text: String) {
         statusText.text = text
-        statusText.setTextColor(if (granted) Color.parseColor("#2E7D32") else Color.parseColor("#C62828"))
+        statusText.setTextColor(
+            if (granted) Color.parseColor("#2E7D32") else Color.parseColor("#C62828")
+        )
     }
 
     override fun onDestroy() {
         super.onDestroy()
         Shizuku.removeRequestPermissionResultListener(permissionListener)
+    }
+
+    inner class CommandAdapter : BaseAdapter() {
+        private val inflater = LayoutInflater.from(this@MainActivity)
+
+        override fun getCount() = commands.size
+        override fun getItem(position: Int) = displayList()[position]
+        override fun getItemId(position: Int) = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = convertView ?: inflater.inflate(R.layout.item_command, parent, false)
+            val text = view.findViewById<TextView>(R.id.itemText)
+            val more = view.findViewById<ImageButton>(R.id.itemMore)
+            text.text = displayList()[position]
+            more.setOnClickListener {
+                showActionMenu(position)
+            }
+            return view
+        }
     }
 }
