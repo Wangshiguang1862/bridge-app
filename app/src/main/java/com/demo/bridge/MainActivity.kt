@@ -1,15 +1,15 @@
 package com.demo.bridge
 
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.ListView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import rikka.shizuku.Shizuku
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private val requestCode = 1001
     private val commands = mutableListOf<String>()
