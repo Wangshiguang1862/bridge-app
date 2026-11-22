@@ -141,33 +141,40 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun executeCommand(command: String) {
+private fun executeCommand(command: String) {
     if (!isShizukuReady() || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
         outputText.text = "Shizuku 未就绪或未授权"
         return
     }
-    try {
-        val result: String
-        val error: String
 
-        // 优先尝试 newRemoteProcessBuilder（较新版本）
+    try {
+        var result = ""
+        var error = ""
+
+        var process: Process? = null
+
         try {
-            val builder = Shizuku.newRemoteProcessBuilder(
-                applicationContext,
-                arrayOf("sh", "-c", command)
+            // 优先：newRemoteProcessBuilder(Context, String[])
+            val method = Shizuku::class.java.getMethod(
+                "newRemoteProcessBuilder",
+                android.content.Context::class.java,
+                Array<String>::class.java
             )
-            val remoteProcess = builder.start()
-            result = remoteProcess.inputStream.bufferedReader().readText()
-            error = remoteProcess.errorStream.bufferedReader().readText()
-            remoteProcess.waitFor()
-        } catch (e: NoSuchMethodError) {
-            // 老版本走 getRemoteProcessBuilder
-            val builder = Shizuku.getRemoteProcessBuilder()
-            builder.command("sh", "-c", command)
-            val remoteProcess = builder.start()
-            result = remoteProcess.inputStream.bufferedReader().readText()
-            error = remoteProcess.errorStream.bufferedReader().readText()
-            remoteProcess.waitFor()
+            val builder = method.invoke(null, applicationContext, arrayOf("sh", "-c", command))
+            process = builder.javaClass.getMethod("start").invoke(builder) as Process
+        } catch (e: NoSuchMethodException) {
+            // 降级：getRemoteProcessBuilder()
+            val method = Shizuku::class.java.getMethod("getRemoteProcessBuilder")
+            val builder = method.invoke(null)
+            builder.javaClass.getMethod("command", Array<String>::class.java)
+                .invoke(builder, arrayOf("sh", "-c", command))
+            process = builder.javaClass.getMethod("start").invoke(builder) as Process
+        }
+
+        process?.let {
+            result = it.inputStream.bufferedReader().readText()
+            error = it.errorStream.bufferedReader().readText()
+            it.waitFor()
         }
 
         val output = buildString {
