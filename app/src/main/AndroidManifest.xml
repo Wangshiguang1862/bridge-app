@@ -1,30 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp">
 
-    <uses-permission android:name="moe.shizuku.manager.permission.API"/>
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="初始化..."
+        android:textSize="18sp" />
 
-    <application
-        android:allowBackup="true"
-        android:label="Bridge"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+    <Button
+        android:id="@+id/requestBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:text="请求 Shizuku 授权" />
 
-        <provider
-    android:name="rikka.shizuku.ShizukuProvider"
-    android:authorities="${applicationId}.shizuku"
-    android:multiprocess="false"
-    android:enabled="true"
-    android:exported="true"
-    android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
+    <Button
+        android:id="@+id/runBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:enabled="false"
+        android:text="执行命令" />
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-
-    </application>
-
-</manifest>
+</LinearLayout>
