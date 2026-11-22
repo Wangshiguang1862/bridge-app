@@ -198,13 +198,4 @@ class MainActivity : AppCompatActivity() {
             }
         }.start()
     }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        try {
-            Shizuku.removeRequestPermissionResultListener(permissionListener)
-        } catch (e: Exception) {
-            // ignore
-        }
-    }
 }
