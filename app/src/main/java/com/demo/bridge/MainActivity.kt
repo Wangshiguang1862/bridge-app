@@ -9,7 +9,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
 import android.widget.CheckBox
 import android.widget.EditText
@@ -28,6 +27,7 @@ class MainActivity : AppCompatActivity() {
 
     private val commands = mutableListOf<String>()
     private val notes = mutableMapOf<String, String>()
+    private val enabled = mutableMapOf<String, Boolean>()
 
     private var selectedIndex = -1
     private val requestCode = 1001
@@ -46,14 +46,17 @@ class MainActivity : AppCompatActivity() {
         listView = findViewById(R.id.listView)
         val btnAdd = findViewById<ImageButton>(R.id.btnAdd)
 
+        loadState()
         adapter = CommandAdapter()
         listView.adapter = adapter
 
         btnAdd.setOnClickListener {
-            val newCmd = "命令 ${commands.size + 1}"
-            commands.add(newCmd)
-            notes[newCmd] = ""
+            val cmd = "命令 ${commands.size + 1}"
+            commands.add(cmd)
+            notes[cmd] = ""
+            enabled[cmd] = true
             adapter.notifyDataSetChanged()
+            persistState()
             Toast.makeText(this, "已添加", Toast.LENGTH_SHORT).show()
         }
 
@@ -79,6 +82,31 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun loadState() {
+        val prefs = getSharedPreferences("bridge", MODE_PRIVATE)
+        commands.clear()
+        prefs.getStringSet("commands", emptySet())?.let { commands.addAll(it) }
+        notes.clear()
+        prefs.getStringSet("notes", emptySet())?.forEach {
+            val parts = it.split("\u0001", limit = 2)
+            if (parts.size == 2) notes[parts[0]] = parts[1]
+        }
+        enabled.clear()
+        prefs.getStringSet("enabled", emptySet())?.forEach {
+            val parts = it.split("\u0001", limit = 2)
+            if (parts.size == 2) enabled[parts[0]] = parts[1].toBoolean()
+        }
+    }
+
+    private fun persistState() {
+        getSharedPreferences("bridge", MODE_PRIVATE).edit().apply {
+            putStringSet("commands", commands.toSet())
+            putStringSet("notes", notes.map { "${it.key}\u0001${it.value}" }.toSet())
+            putStringSet("enabled", enabled.map { "${it.key}\u0001${it.value}" }.toSet())
+            apply()
+        }
+    }
+
     private fun showActionMenu(position: Int) {
         if (position !in commands.indices) return
         selectedIndex = position
@@ -94,8 +122,10 @@ class MainActivity : AppCompatActivity() {
                     3 -> {
                         commands.removeAt(position)
                         notes.remove(cmd)
+                        enabled.remove(cmd)
                         selectedIndex = -1
                         adapter.notifyDataSetChanged()
+                        persistState()
                         Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -113,6 +143,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("保存") { _: DialogInterface, _: Int ->
                 notes[cmd] = input.text.toString().trim()
                 adapter.notifyDataSetChanged()
+                persistState()
             }
             .setNegativeButton("取消") { dialog: DialogInterface, _: Int ->
                 dialog.dismiss()
@@ -148,14 +179,21 @@ class MainActivity : AppCompatActivity() {
             val tvSeq = view.findViewById<TextView>(R.id.tvSeq)
             val tvName = view.findViewById<TextView>(R.id.tvName)
             val cbEnable = view.findViewById<CheckBox>(R.id.cbEnable)
+            val more = view.findViewById<ImageButton>(R.id.itemMore)
 
             val cmd = commands[position]
             tvSeq.text = (position + 1).toString()
             tvName.text = (notes[cmd]?.takeIf { it.isNotBlank() } ?: cmd).take(20)
+
             cbEnable.setOnCheckedChangeListener(null)
-            cbEnable.isChecked = true
+            cbEnable.isChecked = enabled[cmd] != false
+            cbEnable.setOnCheckedChangeListener { _, isChecked ->
+                enabled[cmd] = isChecked
+                persistState()
+            }
 
             view.setOnClickListener { showActionMenu(position) }
+            more.setOnClickListener { showActionMenu(position) }
             return view
         }
     }
