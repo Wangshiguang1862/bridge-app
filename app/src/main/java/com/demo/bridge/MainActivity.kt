@@ -1,19 +1,18 @@
 package com.demo.bridge
 
-import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import rikka.shizuku.Shizuku
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var statusText: TextView
     private lateinit var authButton: Button
@@ -22,71 +21,34 @@ class MainActivity : Activity() {
     private lateinit var outputText: TextView
     private lateinit var outputScroll: ScrollView
 
-    private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-        if (requestCode == REQUEST_CODE_PERMISSION) {
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        if (grantResult == PackageManager.PERMISSION_GRANTED) {
             runOnUiThreadSafe {
-                if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                    statusText.text = "状态: Shizuku 已授权"
-                    authButton.isEnabled = false
-                    execButton.isEnabled = true
-                } else {
-                    statusText.text = "状态: Shizuku 授权被拒绝"
-                    authButton.isEnabled = true
-                    execButton.isEnabled = false
-                }
+                statusText.text = "状态: Shizuku 已授权"
+                authButton.isEnabled = false
+                execButton.isEnabled = true
+                Toast.makeText(this, "Shizuku 授权成功", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            runOnUiThreadSafe {
+                statusText.text = "状态: Shizuku 授权被拒绝"
+                execButton.isEnabled = false
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
-        }
-
-        statusText = TextView(this).apply {
-            text = "状态: 检测中..."
-            textSize = 18f
-        }
-
-        authButton = Button(this).apply {
-            text = "请求 Shizuku 授权"
-            isEnabled = false
-        }
-
-        commandInput = EditText(this).apply {
-            setText("pm list packages")
-            textSize = 16f
-            setPadding(0, 24, 0, 0)
-        }
-
-        execButton = Button(this).apply {
-            text = "执行命令"
-            isEnabled = false
-        }
-
-        outputText = TextView(this).apply {
-            text = "等待执行..."
-            textSize = 14f
-        }
-
-        outputScroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-            addView(outputText)
-        }
-
-        root.addView(statusText)
-        root.addView(authButton)
-        root.addView(commandInput)
-        root.addView(execButton)
-        root.addView(outputScroll)
-        setContentView(root)
+        statusText = findViewById(R.id.statusText)
+        authButton = findViewById(R.id.authButton)
+        execButton = findViewById(R.id.execButton)
+        commandInput = findViewById(R.id.commandInput)
+        outputText = findViewById(R.id.outputText)
+        outputScroll = findViewById(R.id.outputScroll)
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
@@ -117,8 +79,13 @@ class MainActivity : Activity() {
         checkShizukuStatus()
     }
 
+    override fun onDestroy() {
+        Shizuku.removeRequestPermissionResultListener(permissionListener)
+        super.onDestroy()
+    }
+
     private fun runOnUiThreadSafe(block: () -> Unit) {
-        Handler(Looper.getMainLooper()).post(block)
+        mainHandler.post(block)
     }
 
     private fun isShizukuReady(): Boolean {
@@ -165,44 +132,16 @@ class MainActivity : Activity() {
 
             try {
                 val cmdArray = arrayOf("sh", "-c", command)
-                val ctx = applicationContext
-                var proc: Process? = null
-
+                val p = Shizuku.newProcess(cmdArray, null, null)
                 try {
-                    val m = Shizuku::class.java.getMethod(
-                        "newRemoteProcessBuilder",
-                        android.content.Context::class.java,
-                        Array<String>::class.java
-                    )
-                    val builder = m.invoke(null, ctx, cmdArray)
-                    proc = builder.javaClass.getMethod("start").invoke(builder) as Process
-                } catch (t: Throwable) {
-                    val m = Shizuku::class.java.getMethod("getRemoteProcessBuilder")
-                    val builder = m.invoke(null)
-                    builder.javaClass
-                        .getMethod("command", Array<String>::class.java)
-                        .invoke(builder, cmdArray)
-                    proc = builder.javaClass.getMethod("start").invoke(builder) as Process
-                }
-
-                val p = proc
-                if (p != null) {
-                    try {
-                        result = p.inputStream.bufferedReader().readText()
-                        error = p.errorStream.bufferedReader().readText()
-                        exitCode = p.waitFor()
-                    } finally {
-                        p.destroy()
-                    }
-                } else {
-                    error = "未获取到进程"
+                    result = p.inputStream.bufferedReader().use { it.readText() }
+                    error = p.errorStream.bufferedReader().use { it.readText() }
+                    exitCode = p.waitFor()
+                } finally {
+                    p.destroy()
                 }
             } catch (e: Throwable) {
-                error = if (error.isBlank()) {
-                    "Shizuku 执行失败: ${e.message}"
-                } else {
-                    "$error\nShizuku 执行失败: ${e.message}"
-                }
+                error = "Shizuku 执行失败: ${e.message ?: e.javaClass.simpleName}"
             }
 
             val out = buildString {
