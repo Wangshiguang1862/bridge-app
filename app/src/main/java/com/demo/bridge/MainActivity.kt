@@ -1,6 +1,8 @@
-package com.example.bridge
+package com.demo.bridge
 
+import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
@@ -21,16 +23,15 @@ class MainActivity : Activity() {
     private val commands = mutableListOf<String>()
     private val notes = mutableMapOf<Int, String>()
     private var selectedIndex = -1
-
     private val requestCode = 1001
+
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-        val granted = grantResult == PackageManager.PERMISSION_GRANTED
-        refreshStatus(granted)
-        if (!granted) {
-            Toast.makeText(this, "Shizuku 未授权", Toast.LENGTH_SHORT).show()
+        if (requestCode == this.requestCode) {
+            refreshStatus(grantResult == PackageManager.PERMISSION_GRANTED)
         }
     }
 
+    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_command)
@@ -121,13 +122,15 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this)
             .setTitle("编辑备注")
             .setView(input)
-            .setPositiveButton("保存") { _, _ ->
+            .setPositiveButton("保存") { _: DialogInterface, _: Int ->
                 notes[index] = input.text.toString().trim()
                 adapter.clear()
                 adapter.addAll(displayList())
                 adapter.notifyDataSetChanged()
             }
-            .setNegativeButton("取消", null)
+            .setNegativeButton("取消") { dialog: DialogInterface, _: Int ->
+                dialog.dismiss()
+            }
             .show()
     }
 
