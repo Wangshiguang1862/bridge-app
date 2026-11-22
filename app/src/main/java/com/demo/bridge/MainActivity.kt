@@ -1,70 +1,60 @@
 package com.demo.bridge
 
-import android.Manifest
-import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.widget.ArrayAdapter
 import android.widget.Button
-import android.widget.TextView
+import android.widget.ListView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import rikka.shizuku.Shizuku
 
-class MainActivity : Activity() {
-
-    private lateinit var statusText: TextView
-    private lateinit var requestBtn: Button
-    private lateinit var runBtn: Button
+class MainActivity : AppCompatActivity() {
 
     private val requestCode = 1001
+    private val commands = mutableListOf<String>()
+    private lateinit var adapter: ArrayAdapter<String>
 
-    private val permissionListener =
-        Shizuku.OnRequestPermissionResultListener { _, grantResult ->
-            updateStatus()
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        runOnUiThread {
+            if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this@MainActivity, "Shizuku 已授权", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this@MainActivity, "Shizuku 未授权", Toast.LENGTH_SHORT).show()
+            }
         }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_command)
 
-        statusText = findViewById(R.id.statusText)
-        requestBtn = findViewById(R.id.requestBtn)
-        runBtn = findViewById(R.id.runBtn)
+        val btnAdd = findViewById<Button>(R.id.btnAdd)
+        val btnImport = findViewById<Button>(R.id.btnImport)
+        val listView = findViewById<ListView>(R.id.listView)
+
+        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, commands)
+        listView.adapter = adapter
+
+        btnAdd.setOnClickListener {
+            commands.add("命令 ${commands.size + 1}")
+            adapter.notifyDataSetChanged()
+            Toast.makeText(this, "已添加", Toast.LENGTH_SHORT).show()
+        }
+
+        btnImport.setOnClickListener {
+            Toast.makeText(this, "导入功能待接入", Toast.LENGTH_SHORT).show()
+        }
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
-        requestBtn.setOnClickListener {
-            when {
-                Shizuku.isPreV11() || Shizuku.getVersion() < 11 -> {
-                    statusText.text = "Shizuku 版本过低"
-                }
-                Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED -> {
-                    Shizuku.requestPermission(requestCode)
-                }
-                else -> updateStatus()
-            }
+        if (Shizuku.isPreV11() || Shizuku.getVersion() < 11) {
+            Toast.makeText(this, "Shizuku 版本过低", Toast.LENGTH_SHORT).show()
+        } else if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+            Shizuku.requestPermission(requestCode)
+        } else {
+            Toast.makeText(this, "Shizuku 已授权", Toast.LENGTH_SHORT).show()
         }
-
-        runBtn.setOnClickListener {
-            if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                statusText.text = "未授权"
-                return@setOnClickListener
-            }
-
-            try {
-                val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "id"))
-                val result = process.inputStream.bufferedReader().use { it.readText() }
-                statusText.text = result.ifBlank { "命令执行成功，无输出" }
-            } catch (e: Exception) {
-                statusText.text = e.message ?: "执行失败"
-            }
-        }
-
-        updateStatus()
-    }
-
-    private fun updateStatus() {
-        val granted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        statusText.text = if (granted) "Shizuku 已授权" else "Shizuku 未授权"
-        runBtn.isEnabled = granted
     }
 
     override fun onDestroy() {
