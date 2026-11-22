@@ -11,12 +11,12 @@ import android.widget.Toast
 
 class MainActivity : Activity() {
 
-    private lateinit var statusText: TextView
-    private lateinit var authButton: Button
-    private lateinit var execButton: Button
-    private lateinit var commandInput: EditText
-    private lateinit var outputText: TextView
-    private lateinit var outputScroll: ScrollView
+    private var statusText: TextView? = null
+    private var authButton: Button? = null
+    private var execButton: Button? = null
+    private var commandInput: EditText? = null
+    private var outputText: TextView? = null
+    private var outputScroll: ScrollView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,15 +41,15 @@ class MainActivity : Activity() {
 
         setContentView(root)
 
-        authButton.setOnClickListener {
-            statusText.text = "状态: 授权功能待接入"
-            execButton.isEnabled = true
+        authButton?.setOnClickListener {
+            statusText?.text = "状态: 授权功能待接入"
+            execButton?.isEnabled = true
             Toast.makeText(this, "授权功能下一步接入", Toast.LENGTH_SHORT).show()
         }
 
-        execButton.setOnClickListener {
-            val cmd = commandInput.text.toString().trim()
-            outputText.text = if (cmd.isEmpty()) "命令不能为空" else "待执行: $cmd"
+        execButton?.setOnClickListener {
+            val cmd = commandInput?.text?.toString()?.trim().orEmpty()
+            outputText?.text = if (cmd.isEmpty()) "命令不能为空" else "待执行: $cmd"
         }
     }
 }
