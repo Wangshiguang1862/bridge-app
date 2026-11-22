@@ -142,30 +142,44 @@ class MainActivity : Activity() {
     }
 
     private fun executeCommand(command: String) {
-        if (!isShizukuReady() || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-            outputText.text = "Shizuku 未就绪或未授权"
-            return
-        }
-        try {
-            val remoteProcess = Shizuku.newProcess(
-                arrayOf("sh", "-c", command),
-                null,
-                null
-            )
-            val result = remoteProcess.inputStream.bufferedReader().readText()
-            val error = remoteProcess.errorStream.bufferedReader().readText()
-            remoteProcess.waitFor()
-
-            val output = buildString {
-                if (result.isNotBlank()) append(result)
-                if (error.isNotBlank()) append("\n错误:\n$error")
-            }
-            outputText.text = output.ifBlank { "执行完成，无输出" }
-            outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
-        } catch (e: Exception) {
-            outputText.text = "Shizuku 执行失败: ${e.message}"
-        }
+    if (!isShizukuReady() || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
+        outputText.text = "Shizuku 未就绪或未授权"
+        return
     }
+    try {
+        val result: String
+        val error: String
+
+        // 优先尝试 newRemoteProcessBuilder（较新版本）
+        try {
+            val builder = Shizuku.newRemoteProcessBuilder(
+                applicationContext,
+                arrayOf("sh", "-c", command)
+            )
+            val remoteProcess = builder.start()
+            result = remoteProcess.inputStream.bufferedReader().readText()
+            error = remoteProcess.errorStream.bufferedReader().readText()
+            remoteProcess.waitFor()
+        } catch (e: NoSuchMethodError) {
+            // 老版本走 getRemoteProcessBuilder
+            val builder = Shizuku.getRemoteProcessBuilder()
+            builder.command("sh", "-c", command)
+            val remoteProcess = builder.start()
+            result = remoteProcess.inputStream.bufferedReader().readText()
+            error = remoteProcess.errorStream.bufferedReader().readText()
+            remoteProcess.waitFor()
+        }
+
+        val output = buildString {
+            if (result.isNotBlank()) append(result)
+            if (error.isNotBlank()) append("\n错误:\n$error")
+        }
+        outputText.text = output.ifBlank { "执行完成，无输出" }
+        outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    } catch (e: Exception) {
+        outputText.text = "Shizuku 执行失败: ${e.message}"
+    }
+}
 
     override fun onDestroy() {
         super.onDestroy()
