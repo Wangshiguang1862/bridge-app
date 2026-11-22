@@ -39,5 +39,5 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
-    implementation("io.github.iamr0s:Dhizuku-API:2.13.0")
+    implementation("com.github.iamr0s:Dhizuku-API:2.13.0")
 }
