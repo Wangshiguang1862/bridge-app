@@ -1,9 +1,11 @@
 package com.demo.bridge
 
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -12,73 +14,39 @@ import rikka.shizuku.Shizuku
 
 class MainActivity : AppCompatActivity() {
 
-    companion object {
-        private const val REQUEST_CODE = 1001
-    }
-
     private lateinit var statusText: TextView
     private lateinit var authButton: Button
-    private lateinit var commandInput: EditText
     private lateinit var execButton: Button
+    private lateinit var commandInput: EditText
     private lateinit var outputText: TextView
     private lateinit var outputScroll: ScrollView
 
-    private val permissionListener =
-        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-            if (requestCode == REQUEST_CODE) {
-                checkShizukuStatus()
-            }
+    companion object {
+        private const val REQUEST_CODE_PERMISSION = 1001
+    }
+
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        if (grantResult == PackageManager.PERMISSION_GRANTED) {
+            statusText.text = "状态: Shizuku 已授权"
+            authButton.isEnabled = false
+            execButton.isEnabled = true
+        } else {
+            statusText.text = "状态: Shizuku 授权被拒绝"
+            authButton.isEnabled = true
+            execButton.isEnabled = false
         }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 48, 48, 48)
-        }
-
-        statusText = TextView(this).apply {
-            text = "状态: 检测中..."
-            textSize = 18f
-        }
-
-        authButton = Button(this).apply {
-            text = "请求 Shizuku 授权"
-            isEnabled = false
-        }
-
-        commandInput = EditText(this).apply {
-            setText("pm list packages")
-            textSize = 16f
-            setPadding(0, 24, 0, 0)
-        }
-
-        execButton = Button(this).apply {
-            text = "执行命令"
-            isEnabled = false
-        }
-
-        outputText = TextView(this).apply {
-            text = "等待执行..."
-            textSize = 14f
-        }
-
-        outputScroll = ScrollView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-            addView(outputText)
-        }
-
-        root.addView(statusText)
-        root.addView(authButton)
-        root.addView(commandInput)
-        root.addView(execButton)
-        root.addView(outputScroll)
-        setContentView(root)
+        statusText = findViewById(R.id.statusText)
+        authButton = findViewById(R.id.authButton)
+        execButton = findViewById(R.id.execButton)
+        commandInput = findViewById(R.id.commandInput)
+        outputText = findViewById(R.id.outputText)
+        outputScroll = findViewById(R.id.outputScroll)
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
@@ -87,12 +55,12 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Shizuku 未就绪", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
                 statusText.text = "状态: Shizuku 已授权"
-                execButton.isEnabled = true
                 authButton.isEnabled = false
+                execButton.isEnabled = true
             } else {
-                Shizuku.requestPermission(REQUEST_CODE)
+                Shizuku.requestPermission(REQUEST_CODE_PERMISSION)
             }
         }
 
@@ -124,7 +92,7 @@ class MainActivity : AppCompatActivity() {
             execButton.isEnabled = false
             return
         }
-        if (Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
             statusText.text = "状态: Shizuku 已授权"
             authButton.isEnabled = false
             execButton.isEnabled = true
@@ -137,7 +105,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun executeCommand(command: String) {
         if (!isShizukuReady() ||
-            Shizuku.checkSelfPermission() != android.content.pm.PackageManager.PERMISSION_GRANTED
+            Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED
         ) {
             outputText.text = "Shizuku 未就绪或未授权"
             return
@@ -191,7 +159,7 @@ class MainActivity : AppCompatActivity() {
                 append("\n退出码: $exitCode")
             }
 
-            runOnUiThread {
+            Handler(Looper.getMainLooper()).post {
                 outputText.text = out.ifBlank { "执行完成，无输出" }
                 outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
                 execButton.isEnabled = true
