@@ -1,7 +1,7 @@
 package com.demo.bridge
 
-import android.annotation.SuppressLint
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -13,7 +13,6 @@ import android.widget.EditText
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import rikka.shizuku.Shizuku
 
 class MainActivity : Activity() {
@@ -25,13 +24,14 @@ class MainActivity : Activity() {
     private var selectedIndex = -1
     private val requestCode = 1001
 
-    private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-        if (requestCode == this.requestCode) {
-            refreshStatus(grantResult == PackageManager.PERMISSION_GRANTED)
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        val granted = grantResult == PackageManager.PERMISSION_GRANTED
+        refreshStatus(granted)
+        if (!granted) {
+            Toast.makeText(this, "Shizuku 未授权", Toast.LENGTH_SHORT).show()
         }
     }
 
-    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_command)
