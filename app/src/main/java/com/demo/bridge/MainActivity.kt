@@ -1,14 +1,14 @@
 package com.demo.bridge
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import rikka.shizuku.Shizuku
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private lateinit var statusText: TextView
     private lateinit var requestBtn: Button
@@ -16,9 +16,10 @@ class MainActivity : AppCompatActivity() {
 
     private val requestCode = 1001
 
-    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
-        updateStatus()
-    }
+    private val permissionListener =
+        Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+            updateStatus()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,26 +32,29 @@ class MainActivity : AppCompatActivity() {
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
         requestBtn.setOnClickListener {
-            if (Shizuku.isPreV11() || Shizuku.getVersion() < 11) {
-                updateStatus()
-            } else if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                Shizuku.requestPermission(requestCode)
-            } else {
-                updateStatus()
+            when {
+                Shizuku.isPreV11() || Shizuku.getVersion() < 11 -> {
+                    statusText.text = "Shizuku 版本过低"
+                }
+                Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED -> {
+                    Shizuku.requestPermission(requestCode)
+                }
+                else -> updateStatus()
             }
         }
 
         runBtn.setOnClickListener {
-            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-                try {
-                    val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "id"))
-                    val result = process.inputStream.bufferedReader().use { it.readText() }
-                    statusText.text = result
-                } catch (e: Exception) {
-                    statusText.text = e.message
-                }
-            } else {
+            if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
                 statusText.text = "未授权"
+                return@setOnClickListener
+            }
+
+            try {
+                val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", "id"))
+                val result = process.inputStream.bufferedReader().use { it.readText() }
+                statusText.text = result.ifBlank { "命令执行成功，无输出" }
+            } catch (e: Exception) {
+                statusText.text = e.message ?: "执行失败"
             }
         }
 
