@@ -1,270 +1,253 @@
 package com.demo.bridge
 
-import android.Manifest
-import android.app.AlertDialog
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
+import android.widget.ArrayAdapter
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ListView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.textfield.TextInputEditText
-import dev.rikka.shizuku.Shizuku
-import io.github.iamros.dhizuku.Dhizuku
-import io.github.iamros.dhizuku.DhizukuRequestPermissionListener
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
+data class Command(
+    val name: String,
+    val pkg: String,
+    val action: String = ""
+)
+
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var recyclerView: RecyclerView
-    private lateinit var adapter: CommandAdapter
-    private lateinit var inputCommand: TextInputEditText
-    private lateinit var inputDesc: TextInputEditText
-    private lateinit var btnAdd: MaterialButton
-    private lateinit var btnRun: MaterialButton
-
+    private lateinit var listView: ListView
+    private lateinit var adapter: ArrayAdapter<String>
     private val commands = mutableListOf<Command>()
     private val notes = mutableListOf<String>()
 
-    private lateinit var dpm: android.app.admin.DevicePolicyManager
-    private lateinit var admin: ComponentName
+    private val commandsFile: File
+        get() = File(filesDir, "commands.json")
 
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (!granted) {
-                Toast.makeText(this, "需要存储权限才能读写命令文件", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-    private val dhizukuListener = object : DhizukuRequestPermissionListener() {
-        override fun onRequestPermission(grantResult: Int) {
-            if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                initDpm()
-                Toast.makeText(this@MainActivity, "Dhizuku 授权成功", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this@MainActivity, "Dhizuku 未授权", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
+    private val notesFile: File
+        get() = File(filesDir, "notes.json")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        recyclerView = findViewById(R.id.recyclerView)
-        inputCommand = findViewById(R.id.inputCommand)
-        inputDesc = findViewById(R.id.inputDesc)
-        btnAdd = findViewById(R.id.btnAdd)
-        btnRun = findViewById(R.id.btnRun)
+        listView = findViewById(R.id.listView)
+        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, mutableListOf<String>())
+        listView.adapter = adapter
 
-        adapter = CommandAdapter(commands, { pos -> showRunMenu(pos) }, { pos -> showEditMenu(pos) })
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = adapter
+        loadData()
+        refreshList()
 
-        loadState()
+        findViewById<Button>(R.id.btnAdd).setOnClickListener { showAddCommandDialog() }
+        findViewById<Button>(R.id.btnNote).setOnClickListener { showAddNoteDialog() }
 
-        btnAdd.setOnClickListener { addCommand() }
+        listView.setOnItemClickListener { _, _, position, _ ->
+            showItemMenu(position)
+        }
+        listView.setOnItemLongClickListener { _, _, position, _ ->
+            showEditDeleteMenu(position)
+            true
+        }
 
-        checkPermission()
-        checkShizukuPermission()
-        checkDhizukuPermission()
+        // Dhizuku 权限检查已移除，本节不碰系统策略
+        // checkDhizukuPermission()
     }
 
-    private fun checkPermission() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.WRITE_EXTERNAL_STORAGE
-        }
-        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissionLauncher.launch(permission)
-        }
-    }
+    private fun loadData() {
+        commands.clear()
+        notes.clear()
 
-    private fun checkShizukuPermission() {
-        if (!Shizuku.pingBinder()) return
-        if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-            Shizuku.requestPermission(1001)
-        }
-    }
-
-    private fun checkDhizukuPermission() {
-        if (!Dhizuku.isAvailable()) {
-            Toast.makeText(this, "未检测到 Dhizuku", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!Dhizuku.hasPermission()) {
-            Dhizuku.requestPermission(dhizukuListener)
-        } else {
-            initDpm()
-        }
-    }
-
-    private fun initDpm() {
-        admin = ComponentName(this, Dhizuku.getDhizukuReceiver())
-        dpm = Dhizuku.getDevicePolicyManager()
-    }
-
-    private fun addCommand() {
-        val cmd = inputCommand.text?.toString()?.trim().orEmpty()
-        val desc = inputDesc.text?.toString()?.trim().orEmpty()
-        if (cmd.isEmpty()) {
-            Toast.makeText(this, "命令不能为空", Toast.LENGTH_SHORT).show()
-            return
-        }
-        commands.add(Command(cmd, desc))
-        inputCommand.text?.clear()
-        inputDesc.text?.clear()
-        adapter.notifyItemInserted(commands.size - 1)
-        persistState()
-    }
-
-    private fun showRunMenu(pos: Int) {
-        val items = arrayOf("运行", "设备操作")
-        AlertDialog.Builder(this)
-            .setTitle(commands[pos].command)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> runCommand(pos)
-                    1 -> showDeviceActionMenu(commands[pos].command)
+        if (commandsFile.exists()) {
+            try {
+                val arr = JSONArray(commandsFile.readText())
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    commands.add(
+                        Command(
+                            name = obj.optString("name"),
+                            pkg = obj.optString("pkg"),
+                            action = obj.optString("action")
+                        )
+                    )
                 }
+            } catch (_: Exception) {}
+        }
+
+        if (notesFile.exists()) {
+            try {
+                val arr = JSONArray(notesFile.readText())
+                for (i in 0 until arr.length()) {
+                    notes.add(arr.getString(i))
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun saveCommands() {
+        val arr = JSONArray()
+        commands.forEach { c ->
+            val obj = JSONObject()
+            obj.put("name", c.name)
+            obj.put("pkg", c.pkg)
+            obj.put("action", c.action)
+            arr.put(obj)
+        }
+        commandsFile.writeText(arr.toString())
+    }
+
+    private fun saveNotes() {
+        val arr = JSONArray()
+        notes.forEach { arr.put(it) }
+        notesFile.writeText(arr.toString())
+    }
+
+    private fun refreshList() {
+        val items = mutableListOf<String>()
+        commands.forEachIndexed { index, c ->
+            items.add("CMD ${index + 1}: ${c.name} -> ${c.pkg}")
+        }
+        notes.forEachIndexed { index, n ->
+            items.add("NOTE ${index + 1}: $n")
+        }
+        adapter.clear()
+        adapter.addAll(items)
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun showAddCommandDialog() {
+        val view = layoutInflater.inflate(R.layout.dialog_command, null)
+        val etName = view.findViewById<EditText>(R.id.etName)
+        val etPkg = view.findViewById<EditText>(R.id.etPkg)
+        val etAction = view.findViewById<EditText>(R.id.etAction)
+
+        AlertDialog.Builder(this)
+            .setTitle("添加命令")
+            .setView(view)
+            .setPositiveButton("保存") { _, _ ->
+                val name = etName.text.toString().trim()
+                val pkg = etPkg.text.toString().trim()
+                val action = etAction.text.toString().trim()
+                if (name.isEmpty() || pkg.isEmpty()) {
+                    Toast.makeText(this, "名称和包名不能为空", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                commands.add(Command(name, pkg, action))
+                saveCommands()
+                refreshList()
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun showEditMenu(pos: Int) {
-        val items = arrayOf("编辑", "删除")
+    private fun showAddNoteDialog() {
+        val et = EditText(this)
         AlertDialog.Builder(this)
-            .setTitle(commands[pos].command)
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> editCommand(pos)
-                    1 -> deleteCommand(pos)
-                }
+            .setTitle("添加备注")
+            .setView(et)
+            .setPositiveButton("保存") { _, _ ->
+                val text = et.text.toString().trim()
+                if (text.isEmpty()) return@setPositiveButton
+                notes.add(text)
+                saveNotes()
+                refreshList()
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun runCommand(pos: Int) {
-        val cmd = commands[pos].command
-        try {
-            val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
-            val out = proc.inputStream.bufferedReader().readText()
-            val err = proc.errorStream.bufferedReader().readText()
-            val res = if (err.isNotBlank()) err else out
-            AlertDialog.Builder(this)
-                .setTitle("执行结果")
-                .setMessage(res.ifBlank { "无输出" })
-                .setPositiveButton("关闭", null)
-                .show()
-        } catch (e: Exception) {
-            Toast.makeText(this, "执行失败：${e.message}", Toast.LENGTH_SHORT).show()
+    private fun showItemMenu(position: Int) {
+        if (position < commands.size) {
+            val cmd = commands[position]
+            showDeviceActionMenu(cmd.pkg)
+        } else {
+            val noteIndex = position - commands.size
+            Toast.makeText(this, "备注：${notes[noteIndex]}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun editCommand(pos: Int) {
-        val dialogView = layoutInflater.inflate(R.layout.dialog_edit, null)
-        val etCmd = dialogView.findViewById<TextInputEditText>(R.id.editCommand)
-        val etDesc = dialogView.findViewById<TextInputEditText>(R.id.editDesc)
-        etCmd.setText(commands[pos].command)
-        etDesc.setText(commands[pos].desc)
+    private fun showEditDeleteMenu(position: Int) {
+        val options = if (position < commands.size) {
+            arrayOf("编辑命令", "删除命令")
+        } else {
+            arrayOf("编辑备注", "删除备注")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("操作")
+            .setItems(options) { _, which ->
+                if (position < commands.size) {
+                    when (which) {
+                        0 -> showEditCommandDialog(position)
+                        1 -> {
+                            commands.removeAt(position)
+                            saveCommands()
+                            refreshList()
+                        }
+                    }
+                } else {
+                    val idx = position - commands.size
+                    when (which) {
+                        0 -> showEditNoteDialog(idx)
+                        1 -> {
+                            notes.removeAt(idx)
+                            saveNotes()
+                            refreshList()
+                        }
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun showEditCommandDialog(position: Int) {
+        val cmd = commands[position]
+        val view = layoutInflater.inflate(R.layout.dialog_command, null)
+        val etName = view.findViewById<EditText>(R.id.etName)
+        val etPkg = view.findViewById<EditText>(R.id.etPkg)
+        val etAction = view.findViewById<EditText>(R.id.etAction)
+        etName.setText(cmd.name)
+        etPkg.setText(cmd.pkg)
+        etAction.setText(cmd.action)
+
         AlertDialog.Builder(this)
             .setTitle("编辑命令")
-            .setView(dialogView)
+            .setView(view)
             .setPositiveButton("保存") { _, _ ->
-                commands[pos] = Command(
-                    etCmd.text?.toString()?.trim().orEmpty(),
-                    etDesc.text?.toString()?.trim().orEmpty()
+                commands[position] = Command(
+                    etName.text.toString().trim(),
+                    etPkg.text.toString().trim(),
+                    etAction.text.toString().trim()
                 )
-                adapter.notifyItemChanged(pos)
-                persistState()
+                saveCommands()
+                refreshList()
             }
             .setNegativeButton("取消", null)
             .show()
     }
 
-    private fun deleteCommand(pos: Int) {
-        commands.removeAt(pos)
-        adapter.notifyItemRemoved(pos)
-        persistState()
-    }
-
-    private fun showDeviceActionMenu(pkg: String) {
-        Toast.makeText(this, "设备操作将在第二节接入", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun persistState() {
-        val arr = JSONArray()
-        commands.forEach {
-            val o = JSONObject()
-            o.put("command", it.command)
-            o.put("desc", it.desc)
-            arr.put(o)
-        }
-        File(filesDir, "commands.json").writeText(arr.toString())
-        File(filesDir, "notes.json").writeText(JSONArray(notes).toString())
-    }
-
-    private fun loadState() {
-        val cmdFile = File(filesDir, "commands.json")
-        if (cmdFile.exists()) {
-            val arr = JSONArray(cmdFile.readText())
-            commands.clear()
-            for (i in 0 until arr.length()) {
-                val o = arr.getJSONObject(i)
-                commands.add(Command(o.getString("command"), o.optString("desc")))
+    private fun showEditNoteDialog(index: Int) {
+        val et = EditText(this)
+        et.setText(notes[index])
+        AlertDialog.Builder(this)
+            .setTitle("编辑备注")
+            .setView(et)
+            .setPositiveButton("保存") { _, _ ->
+                notes[index] = et.text.toString().trim()
+                saveNotes()
+                refreshList()
             }
-        }
-        val noteFile = File(filesDir, "notes.json")
-        if (noteFile.exists()) {
-            val arr = JSONArray(noteFile.readText())
-            notes.clear()
-            for (i in 0 until arr.length()) notes.add(arr.getString(i))
-        }
-    }
-}
-
-data class Command(val command: String, val desc: String)
-
-class CommandAdapter(
-    private val list: List<Command>,
-    private val onRun: (Int) -> Unit,
-    private val onEdit: (Int) -> Unit
-) : RecyclerView.Adapter<CommandAdapter.VH>() {
-
-    class VH(itemView: android.view.View) : RecyclerView.ViewHolder(itemView) {
-        val title: android.widget.TextView = itemView.findViewById(R.id.itemCommand)
-        val desc: android.widget.TextView = itemView.findViewById(R.id.itemDesc)
-        val btnRun: MaterialButton = itemView.findViewById(R.id.btnItemRun)
-        val btnEdit: MaterialButton = itemView.findViewById(R.id.btnItemEdit)
+            .setNegativeButton("取消", null)
+            .show()
     }
 
-    override fun onCreateViewHolder(parent: android.view.ViewGroup, type: Int): VH {
-        val v = android.view.LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_command, parent, false)
-        return VH(v)
+    // 系统操作占位，本节不调用 Dhizuku / DeviceOwner
+    private fun showDeviceActionMenu(pkg: String) {
+        Toast.makeText(this, "系统操作暂未接入：$pkg", Toast.LENGTH_SHORT).show()
     }
 
-    override fun onBindViewHolder(holder: VH, pos: Int) {
-        val c = list[pos]
-        holder.title.text = c.command
-        holder.desc.text = c.desc
-        holder.btnRun.setOnClickListener { onRun(pos) }
-        holder.btnEdit.setOnClickListener { onEdit(pos) }
-    }
-
-    override fun getItemCount() = list.size
+    // initDpm 等系统策略逻辑本节全部移除
 }
