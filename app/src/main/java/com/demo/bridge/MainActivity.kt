@@ -1,8 +1,6 @@
 package com.demo.bridge
 
 import android.app.AlertDialog
-import android.content.Context
-import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -84,7 +82,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveData() {
         val arr = JSONArray()
-        items.forEach { it ->
+        items.forEach {
             val o = JSONObject()
             o.put("id", it.id)
             o.put("name", it.name)
@@ -186,7 +184,15 @@ class MainActivity : AppCompatActivity() {
                 .inflate(R.layout.item_command, parent, false)
             val tv = v.findViewById<TextView>(R.id.text)
             val it = items[position]
-            tv.text = if (it.note.isNotEmpty()) it.note else "${it.name}\n${it.pkg}"
+            tv.text = if (it.note.isNotEmpty()) {
+                it.note
+            } else {
+                buildString {
+                    append(it.name)
+                    if (it.pkg.isNotEmpty()) append('\n').append(it.pkg)
+                    if (it.action.isNotEmpty()) append('\n').append(it.action)
+                }
+            }
             return v
         }
     }
