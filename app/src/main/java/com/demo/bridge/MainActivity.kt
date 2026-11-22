@@ -1,60 +1,48 @@
 package com.demo.bridge
 
+import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import rikka.shizuku.Shizuku
 
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var statusText: TextView
-    private lateinit var authButton: Button
-    private lateinit var execButton: Button
-    private lateinit var commandInput: EditText
-    private lateinit var outputText: TextView
-    private lateinit var outputScroll: ScrollView
+class MainActivity(
+    private val context: Context,
+    private val statusText: TextView,
+    private val authButton: Button,
+    private val execButton: Button,
+    private val commandInput: EditText,
+    private val outputText: TextView,
+    private val outputScroll: ScrollView
+) {
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val requestCode = 1001
 
-    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
-        if (grantResult == PackageManager.PERMISSION_GRANTED) {
-            runOnUiThreadSafe {
-                statusText.text = "状态: Shizuku 已授权"
-                authButton.isEnabled = false
-                execButton.isEnabled = true
-                Toast.makeText(this, "Shizuku 授权成功", Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            runOnUiThreadSafe {
-                statusText.text = "状态: Shizuku 授权被拒绝"
-                execButton.isEnabled = false
+    private val permissionListener =
+        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode == this.requestCode) {
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    statusText.text = "状态: Shizuku 已授权"
+                    authButton.isEnabled = false
+                    execButton.isEnabled = true
+                } else {
+                    statusText.text = "状态: Shizuku 授权被拒绝"
+                }
             }
         }
-    }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        statusText = findViewById(R.id.statusText)
-        authButton = findViewById(R.id.authButton)
-        execButton = findViewById(R.id.execButton)
-        commandInput = findViewById(R.id.commandInput)
-        outputText = findViewById(R.id.outputText)
-        outputScroll = findViewById(R.id.outputScroll)
-
+    init {
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
         authButton.setOnClickListener {
             if (!isShizukuReady()) {
-                Toast.makeText(this, "Shizuku 未就绪", Toast.LENGTH_SHORT).show()
+                outputText.text = "Shizuku 未就绪"
                 return@setOnClickListener
             }
             if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
@@ -62,7 +50,7 @@ class MainActivity : AppCompatActivity() {
                 authButton.isEnabled = false
                 execButton.isEnabled = true
             } else {
-                Shizuku.requestPermission(REQUEST_CODE_PERMISSION)
+                Shizuku.requestPermission(requestCode)
             }
         }
 
@@ -79,21 +67,14 @@ class MainActivity : AppCompatActivity() {
         checkShizukuStatus()
     }
 
-    override fun onDestroy() {
+    fun onDestroy() {
         Shizuku.removeRequestPermissionResultListener(permissionListener)
-        super.onDestroy()
     }
 
-    private fun runOnUiThreadSafe(block: () -> Unit) {
-        mainHandler.post(block)
-    }
-
-    private fun isShizukuReady(): Boolean {
-        return try {
-            Shizuku.pingBinder()
-        } catch (e: Exception) {
-            false
-        }
+    private fun isShizukuReady(): Boolean = try {
+        Shizuku.pingBinder()
+    } catch (e: Exception) {
+        false
     }
 
     private fun checkShizukuStatus() {
@@ -132,13 +113,14 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 val cmdArray = arrayOf("sh", "-c", command)
-                val p = Shizuku.newProcess(cmdArray, null, null)
+                val proc: Process = buildProcess(context, cmdArray)
+
                 try {
-                    result = p.inputStream.bufferedReader().use { it.readText() }
-                    error = p.errorStream.bufferedReader().use { it.readText() }
-                    exitCode = p.waitFor()
+                    result = proc.inputStream.bufferedReader().use { it.readText() }
+                    error = proc.errorStream.bufferedReader().use { it.readText() }
+                    exitCode = proc.waitFor()
                 } finally {
-                    p.destroy()
+                    proc.destroy()
                 }
             } catch (e: Throwable) {
                 error = "Shizuku 执行失败: ${e.message ?: e.javaClass.simpleName}"
@@ -150,7 +132,7 @@ class MainActivity : AppCompatActivity() {
                 append("\n退出码: $exitCode")
             }
 
-            runOnUiThreadSafe {
+            mainHandler.post {
                 outputText.text = out.ifBlank { "执行完成，无输出" }
                 outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
                 execButton.isEnabled = true
@@ -158,7 +140,31 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    companion object {
-        private const val REQUEST_CODE_PERMISSION = 1001
+    private fun buildProcess(ctx: Context, cmd: Array<String>): Process {
+        // 官方公开入口优先：newRemoteProcessBuilder(Context, String[])
+        try {
+            val m = Shizuku::class.java.getDeclaredMethod(
+                "newRemoteProcessBuilder",
+                Context::class.java,
+                Array<String>::class.java
+            )
+            m.isAccessible = true
+            val builder = m.invoke(null, ctx, cmd)
+            return builder.javaClass.getMethod("start").invoke(builder) as Process
+        } catch (ignored: Throwable) {
+        }
+
+        // 老版本兜底：getRemoteProcessBuilder() + command()
+        try {
+            val m = Shizuku::class.java.getDeclaredMethod("getRemoteProcessBuilder")
+            m.isAccessible = true
+            val builder = m.invoke(null)
+            builder.javaClass
+                .getMethod("command", Array<String>::class.java)
+                .invoke(builder, cmd)
+            return builder.javaClass.getMethod("start").invoke(builder) as Process
+        } catch (e: Throwable) {
+            throw RuntimeException("Shizuku 进程创建失败: ${e.message}", e)
+        }
     }
 }
