@@ -25,14 +25,16 @@ class MainActivity(
     private val requestCode = 1001
 
     private val permissionListener =
-        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-            if (requestCode == this.requestCode) {
+        Shizuku.OnRequestPermissionResultListener { code, grantResult ->
+            if (code == this.requestCode) {
                 if (grantResult == PackageManager.PERMISSION_GRANTED) {
                     statusText.text = "状态: Shizuku 已授权"
                     authButton.isEnabled = false
                     execButton.isEnabled = true
                 } else {
                     statusText.text = "状态: Shizuku 授权被拒绝"
+                    authButton.isEnabled = true
+                    execButton.isEnabled = false
                 }
             }
         }
@@ -42,7 +44,7 @@ class MainActivity(
 
         authButton.setOnClickListener {
             if (!isShizukuReady()) {
-                outputText.text = "Shizuku 未就绪"
+                statusText.text = "状态: Shizuku 未安装或未启动"
                 return@setOnClickListener
             }
             if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
@@ -112,9 +114,7 @@ class MainActivity(
             var exitCode = -1
 
             try {
-                val cmdArray = arrayOf("sh", "-c", command)
-                val proc: Process = buildProcess(context, cmdArray)
-
+                val proc = buildProcess(context, arrayOf("sh", "-c", command))
                 try {
                     result = proc.inputStream.bufferedReader().use { it.readText() }
                     error = proc.errorStream.bufferedReader().use { it.readText() }
@@ -141,7 +141,6 @@ class MainActivity(
     }
 
     private fun buildProcess(ctx: Context, cmd: Array<String>): Process {
-        // 官方公开入口优先：newRemoteProcessBuilder(Context, String[])
         try {
             val m = Shizuku::class.java.getDeclaredMethod(
                 "newRemoteProcessBuilder",
@@ -154,7 +153,6 @@ class MainActivity(
         } catch (ignored: Throwable) {
         }
 
-        // 老版本兜底：getRemoteProcessBuilder() + command()
         try {
             val m = Shizuku::class.java.getDeclaredMethod("getRemoteProcessBuilder")
             m.isAccessible = true
