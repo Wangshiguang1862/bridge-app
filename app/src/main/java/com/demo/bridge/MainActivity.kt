@@ -1,18 +1,19 @@
 package com.demo.bridge
 
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
 import rikka.shizuku.Shizuku
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private lateinit var statusText: TextView
     private lateinit var authButton: Button
@@ -21,32 +22,71 @@ class MainActivity : AppCompatActivity() {
     private lateinit var outputText: TextView
     private lateinit var outputScroll: ScrollView
 
-    companion object {
-        private const val REQUEST_CODE_PERMISSION = 1001
-    }
-
-    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
-        if (grantResult == PackageManager.PERMISSION_GRANTED) {
-            statusText.text = "状态: Shizuku 已授权"
-            authButton.isEnabled = false
-            execButton.isEnabled = true
-        } else {
-            statusText.text = "状态: Shizuku 授权被拒绝"
-            authButton.isEnabled = true
-            execButton.isEnabled = false
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+        if (requestCode == REQUEST_CODE_PERMISSION) {
+            runOnUiThreadSafe {
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    statusText.text = "状态: Shizuku 已授权"
+                    authButton.isEnabled = false
+                    execButton.isEnabled = true
+                } else {
+                    statusText.text = "状态: Shizuku 授权被拒绝"
+                    authButton.isEnabled = true
+                    execButton.isEnabled = false
+                }
+            }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
-        statusText = findViewById(R.id.statusText)
-        authButton = findViewById(R.id.authButton)
-        execButton = findViewById(R.id.execButton)
-        commandInput = findViewById(R.id.commandInput)
-        outputText = findViewById(R.id.outputText)
-        outputScroll = findViewById(R.id.outputScroll)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 48, 48, 48)
+        }
+
+        statusText = TextView(this).apply {
+            text = "状态: 检测中..."
+            textSize = 18f
+        }
+
+        authButton = Button(this).apply {
+            text = "请求 Shizuku 授权"
+            isEnabled = false
+        }
+
+        commandInput = EditText(this).apply {
+            setText("pm list packages")
+            textSize = 16f
+            setPadding(0, 24, 0, 0)
+        }
+
+        execButton = Button(this).apply {
+            text = "执行命令"
+            isEnabled = false
+        }
+
+        outputText = TextView(this).apply {
+            text = "等待执行..."
+            textSize = 14f
+        }
+
+        outputScroll = ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+            addView(outputText)
+        }
+
+        root.addView(statusText)
+        root.addView(authButton)
+        root.addView(commandInput)
+        root.addView(execButton)
+        root.addView(outputScroll)
+        setContentView(root)
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
@@ -75,6 +115,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkShizukuStatus()
+    }
+
+    private fun runOnUiThreadSafe(block: () -> Unit) {
+        Handler(Looper.getMainLooper()).post(block)
     }
 
     private fun isShizukuReady(): Boolean {
@@ -121,6 +165,7 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 val cmdArray = arrayOf("sh", "-c", command)
+                val ctx = applicationContext
                 var proc: Process? = null
 
                 try {
@@ -129,7 +174,7 @@ class MainActivity : AppCompatActivity() {
                         android.content.Context::class.java,
                         Array<String>::class.java
                     )
-                    val builder = m.invoke(null, applicationContext, cmdArray)
+                    val builder = m.invoke(null, ctx, cmdArray)
                     proc = builder.javaClass.getMethod("start").invoke(builder) as Process
                 } catch (t: Throwable) {
                     val m = Shizuku::class.java.getMethod("getRemoteProcessBuilder")
@@ -140,10 +185,17 @@ class MainActivity : AppCompatActivity() {
                     proc = builder.javaClass.getMethod("start").invoke(builder) as Process
                 }
 
-                proc?.use { p ->
-                    result = p.inputStream.bufferedReader().readText()
-                    error = p.errorStream.bufferedReader().readText()
-                    exitCode = p.waitFor()
+                val p = proc
+                if (p != null) {
+                    try {
+                        result = p.inputStream.bufferedReader().readText()
+                        error = p.errorStream.bufferedReader().readText()
+                        exitCode = p.waitFor()
+                    } finally {
+                        p.destroy()
+                    }
+                } else {
+                    error = "未获取到进程"
                 }
             } catch (e: Throwable) {
                 error = if (error.isBlank()) {
@@ -159,11 +211,15 @@ class MainActivity : AppCompatActivity() {
                 append("\n退出码: $exitCode")
             }
 
-            Handler(Looper.getMainLooper()).post {
+            runOnUiThreadSafe {
                 outputText.text = out.ifBlank { "执行完成，无输出" }
                 outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
                 execButton.isEnabled = true
             }
         }.start()
+    }
+
+    companion object {
+        private const val REQUEST_CODE_PERMISSION = 1001
     }
 }
