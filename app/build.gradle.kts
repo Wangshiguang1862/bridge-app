@@ -29,17 +29,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
     kotlinOptions {
         jvmTarget = "17"
     }
 }
 
-    dependencies {
+dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
-    // Dhizuku 全部注释，本节不接
-    // implementation("com.github.iamr0s:Dhizuku-API:x.x.x")
 }
-
