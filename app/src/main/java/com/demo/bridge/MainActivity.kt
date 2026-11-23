@@ -12,7 +12,7 @@ import android.widget.ImageButton
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import android.app.Activity
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -25,7 +25,7 @@ data class CommandItem(
     var note: String = ""
 )
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private lateinit var statusText: TextView
     private lateinit var listView: ListView
