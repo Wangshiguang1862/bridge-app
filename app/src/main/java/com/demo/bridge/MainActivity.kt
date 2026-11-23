@@ -275,49 +275,88 @@ class MainActivity : Activity() {
     data class CommandItem(val name: String, val pkg: String, val action: String, var enabled: Boolean)
 
     private inner class CommandAdapter : BaseAdapter() {
-        override fun getCount() = items.size
-        override fun getItem(p: Int) = items[p]
-        override fun getItemId(p: Int) = p.toLong()
+    private inner class CommandAdapter : BaseAdapter() {
+    override fun getCount() = items.size
+    override fun getItem(p: Int) = items[p]
+    override fun getItemId(p: Int) = p.toLong()
 
-        override fun getView(p: Int, cv: View?, parent: ViewGroup?): View {
-            val item = items[p]
-            val row = LinearLayout(this@MainActivity).apply {
+    private class VH {
+        lateinit var cb: CheckBox
+        lateinit var seq: TextView
+        lateinit var name: TextView
+        lateinit var more: Button
+        var pos = 0
+        var listener: CompoundButton.OnCheckedChangeListener? = null
+    }
+
+    override fun getView(p: Int, cv: View?, parent: ViewGroup?): View {
+        val item = items[p]
+        val row: View
+        val h: VH
+        if (cv == null) {
+            row = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(16, 12, 16, 12)
-                setBackgroundColor(if (p % 2 == 0) 0xFFFFFFFF.toInt() else 0xFFFAFAFA.toInt())
             }
-            val cb = CheckBox(this@MainActivity).apply {
-                isChecked = item.enabled
-                setOnCheckedChangeListener { _, checked -> item.enabled = checked }
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = 12 }
+            h = VH()
+            h.cb = CheckBox(this@MainActivity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { rightMargin = 12 }
             }
-            row.addView(cb)
-            val tvSeq = TextView(this@MainActivity).apply {
-                text = "${p + 1}."
+            h.seq = TextView(this@MainActivity).apply {
                 textSize = 15f
                 setTextColor(0xFF888888.toInt())
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { rightMargin = 8 }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { rightMargin = 8 }
             }
-            row.addView(tvSeq)
-            val tvName = TextView(this@MainActivity).apply {
-                text = item.name
+            h.name = TextView(this@MainActivity).apply {
                 textSize = 16f
                 setTextColor(0xFF222222.toInt())
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
-            row.addView(tvName)
-            val btnMore = Button(this@MainActivity).apply {
+            h.more = Button(this@MainActivity).apply {
                 text = "…"
                 textSize = 18f
                 setPadding(8, 0, 8, 0)
                 minimumWidth = 0
                 minWidth = 0
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-                setOnClickListener { showItemMenu(item, p) }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
             }
-            row.addView(btnMore)
-            return row
+            row.addView(h.cb)
+            row.addView(h.seq)
+            row.addView(h.name)
+            row.addView(h.more)
+            row.tag = h
+        } else {
+            row = cv
+            h = row.tag as VH
         }
+
+        h.pos = p
+        h.cb.setOnCheckedChangeListener(null)
+        h.cb.isChecked = item.enabled
+        h.listener = CompoundButton.OnCheckedChangeListener { _, checked ->
+            val idx = h.pos
+            if (idx in items.indices) {
+                items[idx].enabled = checked
+                saveData()
+            }
+        }
+        h.cb.setOnCheckedChangeListener(h.listener)
+
+        h.seq.text = "${p + 1}."
+        h.name.text = item.name
+        h.more.setOnClickListener { showItemMenu(item, p) }
+
+        row.setBackgroundColor(if (p % 2 == 0) 0xFFFFFFFF.toInt() else 0xFFFAFAFA.toInt())
+        return row
     }
 }
