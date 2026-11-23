@@ -1,64 +1,63 @@
 package com.demo.bridge
 
 import android.content.Context
+import rikka.shizuku.Shizuku
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 object CommandRunner {
 
-    fun run(ctx: Context, item: MainActivity.CommandItem, debug: Boolean): ExecLog {
-        val mode = GlobalState.mode
+    private const val DEFAULT_TIMEOUT_MS = 10_000L
+
+    fun run(context: Context, item: MainActivity.CommandItem, useShizuku: Boolean): ExecLog {
         val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-        val sbOut = StringBuilder()
-        val sbErr = StringBuilder()
-        var ret = -1
+        var retCode = -1
+        var stdout = ""
+        var stderr = ""
 
         try {
-            when (mode) {
-                RunMode.SHIZUKU -> {
-                    if (rikka.shizuku.Shizuku.pingBinder() &&
-                        rikka.shizuku.Shizuku.checkSelfPermission() == 0
-                    ) {
-                        val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", item.action))
-                        sbOut.append(proc.inputStream.bufferedReader().readText())
-                        sbErr.append(proc.errorStream.bufferedReader().readText())
-                        ret = proc.waitFor()
-                    } else {
-                        sbErr.append("Shizuku 未授权")
-                        ret = -2
-                    }
+            if (useShizuku) {
+                if (!Shizuku.pingBinder()) {
+                    stderr = "Shizuku 未就绪"
+                } else {
+                    val cmd = buildCommand(item)
+                    val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
+                    stdout = process.inputStream.bufferedReader().use { it.readText() }
+                    stderr = process.errorStream.bufferedReader().use { it.readText() }
+                    retCode = process.waitFor()
                 }
-                RunMode.ADB -> {
-                    val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", item.action))
-                    sbOut.append(proc.inputStream.bufferedReader().readText())
-                    sbErr.append(proc.errorStream.bufferedReader().readText())
-                    ret = proc.waitFor()
-                }
-                RunMode.BASIC -> {
-                    sbErr.append("基础模式无执行权限")
-                    ret = -3
-                }
+            } else {
+                val cmd = buildCommand(item)
+                val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
+                stdout = process.inputStream.bufferedReader().use { it.readText() }
+                stderr = process.errorStream.bufferedReader().use { it.readText() }
+                retCode = process.waitFor()
             }
         } catch (e: Exception) {
-            sbErr.append(e.message)
-            ret = -4
+            stderr = e.message ?: "未知异常"
+            retCode = -1
         }
 
         val log = ExecLog(
-            System.currentTimeMillis().toString(),
-            time,
-            item.name,
-            mode.name,
-            ret,
-            sbOut.toString(),
-            sbErr.toString()
+            time = time,
+            cmdName = item.name,
+            mode = if (useShizuku) "shizuku" else "normal",
+            retCode = retCode,
+            stdout = stdout,
+            stderr = stderr
         )
-        LogStore.append(ctx, log)
-
-        if (!debug) {
-            Notifier.notify(ctx, item.name, ret == 0, ret)
-        }
-
+        LogStore.add(log)
+        Notifier.show(context, item.name, retCode)
         return log
+    }
+
+    private fun buildCommand(item: MainActivity.CommandItem): String {
+        return when {
+            item.action.startsWith("am ") ||
+            item.action.startsWith("pm ") ||
+            item.action.startsWith("cmd ") -> item.action
+            else -> "am start -n ${item.pkg}/${item.action}"
+        }
     }
 }
