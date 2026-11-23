@@ -1,276 +1,222 @@
 package com.demo.bridge
 
-import android.app.Activity
+import android.Manifest
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
-import android.view.ViewGroup
-import android.widget.BaseAdapter
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.CompoundButton
-import android.widget.LinearLayout
-import android.widget.ListView
-import android.widget.TextView
-import android.widget.Toast
+import android.provider.Settings
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
+import rikka.shizuku.Shizuku
 
-class MainActivity : Activity() {
+class MainActivity : AppCompatActivity() {
 
-    private val REQ_EDIT = 1001
-    private val REQ_SHIZUKU_PERM = 1001
-    private val items = mutableListOf<CommandItem>()
-    private val adapter = CommandAdapter()
+    companion object {
+        const val REQ_EDIT = 1001
+        const val REQ_SHIZUKU = 2001
+        const val REQ_NOTIFY = 3001
+        const val PREFS = "bridge_prefs"
+        const val KEY_DATA = "commands_json"
+    }
+
     private lateinit var listView: ListView
-    private lateinit var tvStatus: TextView
-    private lateinit var tvStatusDot: TextView
+    private lateinit var adapter: CommandAdapter
+    private lateinit var tvMode: TextView
+    val items = mutableListOf<CommandItem>()
+
+    data class CommandItem(
+        val name: String,
+        val pkg: String,
+        val action: String,
+        var enabled: Boolean
+    )
+
+    private class VH {
+        lateinit var cb: CheckBox
+        lateinit var seq: TextView
+        lateinit var name: TextView
+        lateinit var more: Button
+        var pos: Int = 0
+        var listener: CompoundButton.OnCheckedChangeListener? = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        loadData()
+        checkNotifyPermission()
+        buildUi()
+        detectMode()
+    }
 
+    private fun buildUi() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(0xFFF5F5F5.toInt())
         }
 
-        // ===== 顶部栏 =====
-        val topBar = LinearLayout(this).apply {
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(16, 14, 16, 14)
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(24, 28, 24, 24)
             setBackgroundColor(0xFFFFFFFF.toInt())
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
         }
-        val tvTitle = TextView(this).apply {
+        val title = TextView(this).apply {
             text = "Bridge"
-            textSize = 20f
-            setTextColor(0xFF222222.toInt())
+            textSize = 24f
+            setTextColor(0xFF111111.toInt())
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         }
-        topBar.addView(tvTitle)
-
-        val statusLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            setPadding(16, 0, 0, 0)
-        }
-        tvStatusDot = TextView(this).apply {
-            text = "●"
-            textSize = 12f
-            setTextColor(0xFF999999.toInt())
-            setPadding(0, 0, 6, 0)
-        }
-        tvStatus = TextView(this).apply {
-            text = "运行模式：检测中..."
+        tvMode = TextView(this).apply {
             textSize = 13f
             setTextColor(0xFF666666.toInt())
+            setPadding(12, 0, 0, 0)
         }
-        statusLayout.addView(tvStatusDot)
-        statusLayout.addView(tvStatus)
-        topBar.addView(statusLayout)
-
-        val btnSettings = Button(this).apply {
+        val btnSetting = Button(this).apply {
             text = "设置"
-            textSize = 13f
-            setPadding(12, 6, 12, 6)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { weight = 1f; gravity = android.view.Gravity.END }
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         }
-        topBar.addView(btnSettings)
-        root.addView(topBar)
-        root.addView(divider())
+        header.addView(title)
+        header.addView(tvMode)
+        header.addView(btnSetting)
+        root.addView(header)
 
-        // ===== 添加栏 =====
-        val addBar = LinearLayout(this).apply {
+        val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(16, 10, 16, 10)
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(24, 16, 24, 16)
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
         val btnAdd = Button(this).apply {
             text = "+ 添加"
-            textSize = 14f
-            setPadding(10, 4, 10, 4)
-            setOnClickListener { showAddPage() }
+            setOnClickListener {
+                startActivityForResult(Intent(this@MainActivity, EditCommandActivity::class.java), REQ_EDIT)
+            }
         }
-        addBar.addView(btnAdd)
-        val tvListTitle = TextView(this).apply {
+        val tvList = TextView(this).apply {
             text = "命令列表"
-            textSize = 15f
-            setTextColor(0xFF333333.toInt())
-            setPadding(12, 0, 0, 0)
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            textSize = 16f
+            setTextColor(0xFF222222.toInt())
+            setPadding(16, 0, 0, 0)
         }
-        addBar.addView(tvListTitle)
-        root.addView(addBar)
-        root.addView(divider())
+        bar.addView(btnAdd)
+        bar.addView(tvList)
+        root.addView(bar)
 
-        // ===== 列表 =====
-        listView = ListView(this).apply {
-            dividerHeight = 1
-            setDivider(resources.getDrawable(android.R.drawable.divider_horizontal_bright))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-            )
-        }
-        root.addView(listView)
-
-        setContentView(root)
+        listView = ListView(this).apply { dividerHeight = 1 }
+        adapter = CommandAdapter()
         listView.adapter = adapter
-        loadData()
-        if (items.isEmpty()) {
-            items.addAll(defaultItems())
-            saveData()
-            adapter.notifyDataSetChanged()
-        }
-
-        detectMode()
-    }
-
-    private fun divider() = View(this).apply {
-        setBackgroundColor(0xFFDDDDDD.toInt())
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
+        root.addView(listView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+        ))
+        setContentView(root)
     }
 
     private fun detectMode() {
-        try {
-            if (!rikka.shizuku.Shizuku.pingBinder()) {
-                setStatus(0xFF999999.toInt(), "运行模式：基础（Shizuku 未运行）")
-                return
-            }
-            if (rikka.shizuku.Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                setStatus(0xFFFF9800.toInt(), "运行模式：等待 Shizuku 授权...")
-                if (rikka.shizuku.Shizuku.shouldShowRequestPermissionRationale()) {
-                    AlertDialog.Builder(this)
-                        .setTitle("需要 Shizuku 授权")
-                        .setMessage("Bridge 需要 Shizuku 权限来执行命令，请在弹出的授权框中点击允许。")
-                        .setPositiveButton("去授权") { _, _ ->
-                            rikka.shizuku.Shizuku.requestPermission(REQ_SHIZUKU_PERM)
-                        }
-                        .setNegativeButton("使用基础模式") { _, _ ->
-                            setStatus(0xFF999999.toInt(), "运行模式：基础")
-                        }
-                        .show()
+        when {
+            Shizuku.pingBinder() -> {
+                if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+                    tvMode.text = "● 运行模式：shizuku"
                 } else {
-                    rikka.shizuku.Shizuku.requestPermission(REQ_SHIZUKU_PERM)
+                    tvMode.text = "○ 运行模式：shizuku（待授权）"
+                    requestShizuku()
                 }
-                return
             }
-            setStatus(0xFF3DDC84.toInt(), "运行模式：shizuku")
-        } catch (e: Exception) {
-            setStatus(0xFF999999.toInt(), "运行模式：基础")
+            else -> tvMode.text = "○ 运行模式：基础"
         }
     }
 
-    private fun setStatus(color: Int, text: String) {
-        tvStatusDot.setTextColor(color)
-        tvStatus.text = text
+    private fun requestShizuku() {
+        if (Shizuku.shouldShowRequestPermissionRationale()) {
+            Toast.makeText(this, "请授予 Bridge 的 Shizuku 权限", Toast.LENGTH_LONG).show()
+        }
+        Shizuku.requestPermission(REQ_SHIZUKU)
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQ_SHIZUKU_PERM) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                setStatus(0xFF3DDC84.toInt(), "运行模式：shizuku")
-                Toast.makeText(this, "Shizuku 授权成功", Toast.LENGTH_SHORT).show()
-            } else {
-                setStatus(0xFFFF9800.toInt(), "运行模式：adb（Shizuku 未授权）")
-                Toast.makeText(this, "Shizuku 授权被拒绝，将使用 adb 模式", Toast.LENGTH_SHORT).show()
-            }
+    override fun onRequestPermissionsResult(code: Int, perms: Array<String>, grant: IntArray) {
+        super.onRequestPermissionsResult(code, perms, grant)
+        if (code == REQ_SHIZUKU || code == REQ_NOTIFY) detectMode()
+    }
+
+    private fun checkNotifyPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFY)
         }
     }
-
-    private fun defaultItems() = listOf(
-        CommandItem("打开设置", "com.android.settings", "am start -n com.android.settings/.Settings", false),
-        CommandItem("重启系统", "", "reboot", false),
-        CommandItem("清后台", "", "am kill-all", false)
-    )
 
     private fun loadData() {
+        items.clear()
         try {
-            val f = File(applicationContext.filesDir, "commands.json")
-            if (!f.exists()) return
-            items.clear()
-            val arr = JSONArray(f.readText())
+            val raw = getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_DATA, "[]") ?: "[]"
+            val arr = JSONArray(raw)
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                items.add(
-                    CommandItem(
-                        o.optString("name"),
-                        o.optString("pkg"),
-                        o.optString("action"),
-                        o.optBoolean("enabled", false)
-                    )
-                )
+                items.add(CommandItem(
+                    o.optString("name"),
+                    o.optString("pkg"),
+                    o.optString("action"),
+                    o.optBoolean("enabled", false)
+                ))
             }
-            adapter.notifyDataSetChanged()
-        } catch (e: Exception) {
-            Toast.makeText(this, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
+        } catch (_: Exception) {}
     }
 
     fun saveData() {
         val arr = JSONArray()
-        for (it in items) {
-            arr.put(JSONObject().apply {
-                put("name", it.name)
-                put("pkg", it.pkg)
-                put("action", it.action)
-                put("enabled", it.enabled)
-            })
+        items.forEach {
+            val o = JSONObject()
+            o.put("name", it.name)
+            o.put("pkg", it.pkg)
+            o.put("action", it.action)
+            o.put("enabled", it.enabled)
+            arr.put(o)
         }
-        File(applicationContext.filesDir, "commands.json").writeText(arr.toString())
-    }
-
-    private fun showAddPage() {
-        startActivityForResult(Intent(this, EditCommandActivity::class.java), REQ_EDIT)
+        getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putString(KEY_DATA, arr.toString()).apply()
     }
 
     private fun showItemMenu(item: CommandItem, pos: Int) {
         AlertDialog.Builder(this)
             .setTitle(item.name)
-            .setItems(arrayOf("编辑", "导入/导出", "运行", "删除")) { _, w ->
+            .setItems(arrayOf("编辑", "导入/导出", "立即执行", "删除")) { _, w ->
                 when (w) {
                     0 -> startActivityForResult(Intent(this, EditCommandActivity::class.java).apply {
+                        putExtra("isEdit", true)
+                        putExtra("originalName", item.name)
                         putExtra("name", item.name)
                         putExtra("pkg", item.pkg)
                         putExtra("action", item.action)
                     }, REQ_EDIT)
                     1 -> Toast.makeText(this, "导入/导出：后续版本", Toast.LENGTH_SHORT).show()
-                    2 -> {
-                        val log = CommandRunner.run(this, item, true)
-                        AlertDialog.Builder(this)
-                            .setTitle("执行结果")
-                            .setMessage("返回码: ${log.retCode}\n输出: ${log.stdout}\n错误: ${log.stderr}")
-                            .setPositiveButton("确定", null).show()
-                    }
-                    3 -> {
-                        items.removeAt(pos)
-                        saveData()
-                        adapter.notifyDataSetChanged()
-                    }
+                    2 -> Toast.makeText(this, "执行：${item.name}", Toast.LENGTH_SHORT).show()
+                    3 -> { items.removeAt(pos); saveData(); adapter.notifyDataSetChanged() }
                 }
             }.show()
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQ_EDIT && resultCode == RESULT_OK && data != null) {
+    override fun onActivityResult(req: Int, res: Int, data: Intent?) {
+        super.onActivityResult(req, res, data)
+        if (req == REQ_EDIT && res == RESULT_OK && data != null) {
             val name = data.getStringExtra("name") ?: return
             val pkg = data.getStringExtra("pkg") ?: ""
             val action = data.getStringExtra("action") ?: ""
             val isEdit = data.getBooleanExtra("isEdit", false)
-            val originalName = data.getStringExtra("originalName") ?: ""
+            val orig = data.getStringExtra("originalName") ?: ""
             if (isEdit) {
-                val idx = items.indexOfFirst { it.name == originalName }
+                val idx = items.indexOfFirst { it.name == orig }
                 if (idx >= 0) items[idx] = CommandItem(name, pkg, action, items[idx].enabled)
             } else {
                 items.add(CommandItem(name, pkg, action, false))
@@ -280,19 +226,7 @@ class MainActivity : Activity() {
         }
     }
 
-    data class CommandItem(val name: String, val pkg: String, val action: String, var enabled: Boolean)
-
     private inner class CommandAdapter : BaseAdapter() {
-
-        private class VH {
-            lateinit var cb: CheckBox
-            lateinit var seq: TextView
-            lateinit var name: TextView
-            lateinit var more: Button
-            var pos: Int = 0
-            var listener: CompoundButton.OnCheckedChangeListener? = null
-        }
-
         override fun getCount() = items.size
         override fun getItem(p: Int) = items[p]
         override fun getItemId(p: Int) = p.toLong()
@@ -304,7 +238,7 @@ class MainActivity : Activity() {
             if (cv == null) {
                 row = LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
+                    gravity = android.view.Gravity.CENTER_VERTICAL
                     setPadding(16, 12, 16, 12)
                 }
                 h = VH()
@@ -351,12 +285,12 @@ class MainActivity : Activity() {
             }
 
             h.pos = p
-            h.listener?.let { l -> h.cb.setOnCheckedChangeListener(null) }
+            h.listener = null
+            h.cb.setOnCheckedChangeListener(null)
             h.cb.isChecked = item.enabled
             h.listener = CompoundButton.OnCheckedChangeListener { _, checked ->
-                val idx = h.pos
-                if (idx in items.indices) {
-                    items[idx].enabled = checked
+                if (h.pos in items.indices) {
+                    items[h.pos].enabled = checked
                     saveData()
                 }
             }
