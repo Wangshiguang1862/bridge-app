@@ -148,7 +148,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showItemMenu(item: CommandItem, pos: Int) {
         val opts = arrayOf("编辑", "删除", "系统操作")
-        AlertDialog.Builder(this)
+        AlertDialog.Builder(this@MainActivity)
             .setTitle(item.name)
             .setItems(opts) { _, which ->
                 when (which) {
@@ -165,7 +165,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showDeviceActionMenu(pkg: String) {
-        Toast.makeText(this, "系统操作暂未接入：$pkg", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this@MainActivity, "系统操作暂未接入：$pkg", Toast.LENGTH_SHORT).show()
     }
 
     private inner class CommandAdapter : BaseAdapter() {
@@ -174,8 +174,8 @@ class MainActivity : AppCompatActivity() {
         override fun getItemId(position: Int): Long = items[position].id
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
-            val v = convertView ?: LayoutInflater.from(this@MainActivity)
-                .inflate(R.layout.item_command, parent, false)
+        val inflater = LayoutInflater.from(this@MainActivity)
+            val v = convertView ?: inflater.inflate(R.layout.item_command, parent, false)
             val tv = v.findViewById<TextView>(R.id.text)
             val it = items[position]
             tv.text = if (it.note.isNotEmpty()) {
