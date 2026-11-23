@@ -48,7 +48,6 @@ object CommandRunner {
             stderr = stderr
         )
         LogStore.add(log)
-        Notifier.show(context, item.name, retCode)
         return log
     }
 
