@@ -1,25 +1,27 @@
 package com.demo.bridge
 
-import android.app.Activity
-import android.os.Bundle
-import android.widget.TextView
-import android.widget.Toast
+object LogStore {
+    private const val MAX = 20
+    private val logs = ArrayDeque<ExecLog>()
 
-class LogListActivity : Activity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val tv = TextView(this)
-        setContentView(tv)
-        val logs = LogStore.list(this)
-        if (logs.isEmpty()) { tv.text = "暂无日志"; return }
-        tv.text = logs.joinToString("\n\n") { "${it.time} ${it.cmdName} ${it.mode} ret=${it.retCode}" }
-        tv.setOnClickListener {
-            if (logs.isNotEmpty()) {
-                val l = logs.first()
-                AlertDialog.Builder(this).setTitle(l.cmdName).setMessage(
-                    "时间：${l.time}\n模式：${l.mode}\n返回码：${l.retCode}\n输出：${l.stdout}\n错误：${l.stderr}"
-                ).setPositiveButton("确定", null).show()
-            }
-        }
+    @Synchronized
+    fun add(log: ExecLog) {
+        logs.addLast(log)
+        while (logs.size > MAX) logs.removeFirst()
     }
+
+    @Synchronized
+    fun all(): List<ExecLog> = logs.toList()
+
+    @Synchronized
+    fun clear() = logs.clear()
 }
+
+data class ExecLog(
+    val time: String,
+    val cmdName: String,
+    val mode: String,
+    val retCode: Int,
+    val stdout: String,
+    val stderr: String
+)
