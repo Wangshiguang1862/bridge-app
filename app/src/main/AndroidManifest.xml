@@ -1,59 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.demo.bridge">
-
-    <uses-permission android:name="android.permission.INTERNET" />
-
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:allowBackup="true"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:theme="@style/Theme.BridgeApp">
-
-        <!-- 启动入口 -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+        android:theme="@style/AppTheme">
+        <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-
-        <!-- 内部 Activity -->
-        <activity
-            android:name=".EditCommandActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".SettingsActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".LogListActivity"
-            android:exported="false" />
-
-        <!-- 外部命令接口 -->
-        <activity
-            android:name=".BridgeCommandReceiver"
-            android:exported="true">
+        <activity android:name=".SettingsActivity"/>
+        <activity android:name=".EditCommandActivity"/>
+        <activity android:name=".LogListActivity"/>
+        <service android:name=".BridgeService" android:exported="false"/>
+        <receiver android:name=".BootReceiver" android:exported="true">
             <intent-filter>
-                <action android:name="com.demo.bridge.EXECUTE" />
-                <category android:name="android.intent.category.DEFAULT" />
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
             </intent-filter>
-        </activity>
-
-        <!-- Shizuku Provider -->
-        <provider
-            android:name="rikka.shizuku.ShizukuProvider"
-            android:authorities="${applicationId}.shizuku"
-            android:multiprocess="false"
-            android:enabled="true"
-            android:exported="true"
-            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL" />
-
+        </receiver>
     </application>
-
 </manifest>
