@@ -19,9 +19,9 @@ class MainActivity : Activity() {
         const val KEY_CMDS = "commands"
     }
 
-    lateinit var listView: ListView
-    lateinit var adapter: CommandAdapter
-    val items = mutableListOf<CommandItem>()
+    private lateinit var listView: ListView
+    private lateinit var adapter: CommandAdapter
+    private val items = mutableListOf<CommandItem>()
 
     data class CommandItem(
         val name: String,
