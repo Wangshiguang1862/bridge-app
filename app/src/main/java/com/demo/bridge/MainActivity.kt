@@ -22,7 +22,6 @@ class MainActivity : Activity() {
     private val adapter = CommandAdapter()
 
     private lateinit var listView: ListView
-    private val filesDir: File get() = applicationContext.filesDir
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,7 +52,7 @@ class MainActivity : Activity() {
 
     private fun loadData() {
         try {
-            val f = File(filesDir, "commands.json")
+            val f = File(applicationContext.filesDir, "commands.json")
             if (!f.exists()) return
             items.clear()
             val arr = JSONArray(f.readText())
@@ -86,7 +85,7 @@ class MainActivity : Activity() {
                 }
             )
         }
-        File(filesDir, "commands.json").writeText(arr.toString())
+        File(applicationContext.filesDir, "commands.json").writeText(arr.toString())
     }
 
     private fun showItemMenu(item: CommandItem, pos: Int) {
