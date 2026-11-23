@@ -1,24 +1,39 @@
 package com.demo.bridge
 
+import android.app.Activity
 import android.app.AlertDialog
 import android.os.Bundle
 import android.widget.ArrayAdapter
+import android.widget.LinearLayout
 import android.widget.ListView
-import androidx.appcompat.app.AppCompatActivity
+import android.widget.TextView
 
-class LogListActivity : AppCompatActivity() {
+class LogListActivity : Activity() {
 
     private lateinit var listView: ListView
     private lateinit var adapter: ArrayAdapter<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_log_list)
 
-        listView = findViewById(R.id.logListView)
-        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, mutableListOf())
+        // 兜底布局，避免依赖不存在的 activity_log_list.xml
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(TextView(this@LogListActivity).apply { text = "执行日志" })
+        }
+        listView = ListView(this).apply { id = android.R.id.list }
+        root.addView(listView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0, 1f
+        ))
+        setContentView(root)
+
+        adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_1,
+            ArrayList<String>()
+        )
         listView.adapter = adapter
-
         loadLogs()
 
         listView.setOnItemClickListener { _, _, position, _ ->
