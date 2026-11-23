@@ -6,12 +6,12 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.Gravity
-import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.CompoundButton
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
@@ -38,7 +38,7 @@ class MainActivity : Activity() {
             setBackgroundColor(0xFFF5F5F5.toInt())
         }
 
-        // ===== 顶部栏：Bridge 标题 + 运行状态 + 设置按钮 =====
+        // ===== 顶部栏 =====
         val topBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -49,7 +49,6 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
-
         val tvTitle = TextView(this).apply {
             text = "Bridge"
             textSize = 20f
@@ -87,14 +86,9 @@ class MainActivity : Activity() {
         }
         topBar.addView(btnSettings)
         root.addView(topBar)
+        root.addView(divider())
 
-        // 分隔线
-        root.addView(View(this).apply {
-            setBackgroundColor(0xFFDDDDDD.toInt())
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
-        })
-
-        // ===== 添加栏：+ 添加 + 命令列表标题 =====
+        // ===== 添加栏 =====
         val addBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -117,12 +111,7 @@ class MainActivity : Activity() {
         }
         addBar.addView(tvListTitle)
         root.addView(addBar)
-
-        // 分隔线
-        root.addView(View(this).apply {
-            setBackgroundColor(0xFFDDDDDD.toInt())
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
-        })
+        root.addView(divider())
 
         // ===== 列表 =====
         listView = ListView(this).apply {
@@ -146,16 +135,19 @@ class MainActivity : Activity() {
         detectMode()
     }
 
+    private fun divider() = View(this).apply {
+        setBackgroundColor(0xFFDDDDDD.toInt())
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
+    }
+
     private fun detectMode() {
         try {
             if (!rikka.shizuku.Shizuku.pingBinder()) {
-                tvStatusDot.setTextColor(0xFF999999.toInt())
-                tvStatus.text = "运行模式：基础（Shizuku 未运行）"
+                setStatus(0xFF999999.toInt(), "运行模式：基础（Shizuku 未运行）")
                 return
             }
             if (rikka.shizuku.Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                tvStatusDot.setTextColor(0xFFFF9800.toInt())
-                tvStatus.text = "运行模式：等待 Shizuku 授权..."
+                setStatus(0xFFFF9800.toInt(), "运行模式：等待 Shizuku 授权...")
                 if (rikka.shizuku.Shizuku.shouldShowRequestPermissionRationale()) {
                     AlertDialog.Builder(this)
                         .setTitle("需要 Shizuku 授权")
@@ -164,8 +156,7 @@ class MainActivity : Activity() {
                             rikka.shizuku.Shizuku.requestPermission(REQ_SHIZUKU_PERM)
                         }
                         .setNegativeButton("使用基础模式") { _, _ ->
-                            tvStatusDot.setTextColor(0xFF999999.toInt())
-                            tvStatus.text = "运行模式：基础"
+                            setStatus(0xFF999999.toInt(), "运行模式：基础")
                         }
                         .show()
                 } else {
@@ -173,33 +164,34 @@ class MainActivity : Activity() {
                 }
                 return
             }
-            tvStatusDot.setTextColor(0xFF3DDC84.toInt())
-            tvStatus.text = "运行模式：shizuku"
+            setStatus(0xFF3DDC84.toInt(), "运行模式：shizuku")
         } catch (e: Exception) {
-            tvStatusDot.setTextColor(0xFF999999.toInt())
-            tvStatus.text = "运行模式：基础"
+            setStatus(0xFF999999.toInt(), "运行模式：基础")
         }
+    }
+
+    private fun setStatus(color: Int, text: String) {
+        tvStatusDot.setTextColor(color)
+        tvStatus.text = text
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_SHIZUKU_PERM) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                tvStatusDot.setTextColor(0xFF3DDC84.toInt())
-                tvStatus.text = "运行模式：shizuku"
+                setStatus(0xFF3DDC84.toInt(), "运行模式：shizuku")
                 Toast.makeText(this, "Shizuku 授权成功", Toast.LENGTH_SHORT).show()
             } else {
-                tvStatusDot.setTextColor(0xFFFF9800.toInt())
-                tvStatus.text = "运行模式：adb（Shizuku 未授权）"
+                setStatus(0xFFFF9800.toInt(), "运行模式：adb（Shizuku 未授权）")
                 Toast.makeText(this, "Shizuku 授权被拒绝，将使用 adb 模式", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     private fun defaultItems() = listOf(
-        CommandItem("打开设置", "com.android.settings", "am start -n com.android.settings/.Settings", true),
-        CommandItem("重启系统", "", "reboot", true),
-        CommandItem("清后台", "", "am kill-all", true)
+        CommandItem("打开设置", "com.android.settings", "am start -n com.android.settings/.Settings", false),
+        CommandItem("重启系统", "", "reboot", false),
+        CommandItem("清后台", "", "am kill-all", false)
     )
 
     private fun loadData() {
@@ -210,7 +202,14 @@ class MainActivity : Activity() {
             val arr = JSONArray(f.readText())
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                items.add(CommandItem(o.optString("name"), o.optString("pkg"), o.optString("action"), o.optBoolean("enabled", true)))
+                items.add(
+                    CommandItem(
+                        o.optString("name"),
+                        o.optString("pkg"),
+                        o.optString("action"),
+                        o.optBoolean("enabled", false)
+                    )
+                )
             }
             adapter.notifyDataSetChanged()
         } catch (e: Exception) {
@@ -221,7 +220,12 @@ class MainActivity : Activity() {
     fun saveData() {
         val arr = JSONArray()
         for (it in items) {
-            arr.put(JSONObject().apply { put("name", it.name); put("pkg", it.pkg); put("action", it.action); put("enabled", it.enabled) })
+            arr.put(JSONObject().apply {
+                put("name", it.name)
+                put("pkg", it.pkg)
+                put("action", it.action)
+                put("enabled", it.enabled)
+            })
         }
         File(applicationContext.filesDir, "commands.json").writeText(arr.toString())
     }
@@ -248,7 +252,11 @@ class MainActivity : Activity() {
                             .setMessage("返回码: ${log.retCode}\n输出: ${log.stdout}\n错误: ${log.stderr}")
                             .setPositiveButton("确定", null).show()
                     }
-                    3 -> { items.removeAt(pos); saveData(); adapter.notifyDataSetChanged() }
+                    3 -> {
+                        items.removeAt(pos)
+                        saveData()
+                        adapter.notifyDataSetChanged()
+                    }
                 }
             }.show()
     }
@@ -265,7 +273,7 @@ class MainActivity : Activity() {
                 val idx = items.indexOfFirst { it.name == originalName }
                 if (idx >= 0) items[idx] = CommandItem(name, pkg, action, items[idx].enabled)
             } else {
-                items.add(CommandItem(name, pkg, action, true))
+                items.add(CommandItem(name, pkg, action, false))
             }
             saveData()
             adapter.notifyDataSetChanged()
@@ -275,88 +283,90 @@ class MainActivity : Activity() {
     data class CommandItem(val name: String, val pkg: String, val action: String, var enabled: Boolean)
 
     private inner class CommandAdapter : BaseAdapter() {
-    private inner class CommandAdapter : BaseAdapter() {
-    override fun getCount() = items.size
-    override fun getItem(p: Int) = items[p]
-    override fun getItemId(p: Int) = p.toLong()
 
-    private class VH {
-        lateinit var cb: CheckBox
-        lateinit var seq: TextView
-        lateinit var name: TextView
-        lateinit var more: Button
-        var pos = 0
-        var listener: CompoundButton.OnCheckedChangeListener? = null
-    }
-
-    override fun getView(p: Int, cv: View?, parent: ViewGroup?): View {
-        val item = items[p]
-        val row: View
-        val h: VH
-        if (cv == null) {
-            row = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(16, 12, 16, 12)
-            }
-            h = VH()
-            h.cb = CheckBox(this@MainActivity).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { rightMargin = 12 }
-            }
-            h.seq = TextView(this@MainActivity).apply {
-                textSize = 15f
-                setTextColor(0xFF888888.toInt())
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { rightMargin = 8 }
-            }
-            h.name = TextView(this@MainActivity).apply {
-                textSize = 16f
-                setTextColor(0xFF222222.toInt())
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            }
-            h.more = Button(this@MainActivity).apply {
-                text = "…"
-                textSize = 18f
-                setPadding(8, 0, 8, 0)
-                minimumWidth = 0
-                minWidth = 0
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            }
-            row.addView(h.cb)
-            row.addView(h.seq)
-            row.addView(h.name)
-            row.addView(h.more)
-            row.tag = h
-        } else {
-            row = cv
-            h = row.tag as VH
+        private class VH {
+            lateinit var cb: CheckBox
+            lateinit var seq: TextView
+            lateinit var name: TextView
+            lateinit var more: Button
+            var pos: Int = 0
+            var listener: CompoundButton.OnCheckedChangeListener? = null
         }
 
-        h.pos = p
-        h.cb.setOnCheckedChangeListener(null)
-        h.cb.isChecked = item.enabled
-        h.listener = CompoundButton.OnCheckedChangeListener { _, checked ->
-            val idx = h.pos
-            if (idx in items.indices) {
-                items[idx].enabled = checked
-                saveData()
+        override fun getCount() = items.size
+        override fun getItem(p: Int) = items[p]
+        override fun getItemId(p: Int) = p.toLong()
+
+        override fun getView(p: Int, cv: View?, parent: ViewGroup?): View {
+            val item = items[p]
+            val row: View
+            val h: VH
+            if (cv == null) {
+                row = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(16, 12, 16, 12)
+                }
+                h = VH()
+                h.cb = CheckBox(this@MainActivity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { rightMargin = 12 }
+                }
+                h.seq = TextView(this@MainActivity).apply {
+                    textSize = 15f
+                    setTextColor(0xFF888888.toInt())
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { rightMargin = 8 }
+                }
+                h.name = TextView(this@MainActivity).apply {
+                    textSize = 16f
+                    setTextColor(0xFF222222.toInt())
+                    layoutParams = LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                    )
+                }
+                h.more = Button(this@MainActivity).apply {
+                    text = "…"
+                    textSize = 18f
+                    setPadding(8, 0, 8, 0)
+                    minimumWidth = 0
+                    minWidth = 0
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                }
+                row.addView(h.cb)
+                row.addView(h.seq)
+                row.addView(h.name)
+                row.addView(h.more)
+                row.tag = h
+            } else {
+                row = cv
+                h = row.tag as VH
             }
+
+            h.pos = p
+            h.listener?.let { l -> h.cb.setOnCheckedChangeListener(null) }
+            h.cb.isChecked = item.enabled
+            h.listener = CompoundButton.OnCheckedChangeListener { _, checked ->
+                val idx = h.pos
+                if (idx in items.indices) {
+                    items[idx].enabled = checked
+                    saveData()
+                }
+            }
+            h.cb.setOnCheckedChangeListener(h.listener)
+
+            h.seq.text = "${p + 1}."
+            h.name.text = item.name
+            h.more.setOnClickListener { showItemMenu(item, p) }
+            row.setBackgroundColor(if (p % 2 == 0) 0xFFFFFFFF.toInt() else 0xFFFAFAFA.toInt())
+            return row
         }
-        h.cb.setOnCheckedChangeListener(h.listener)
-
-        h.seq.text = "${p + 1}."
-        h.name.text = item.name
-        h.more.setOnClickListener { showItemMenu(item, p) }
-
-        row.setBackgroundColor(if (p % 2 == 0) 0xFFFFFFFF.toInt() else 0xFFFAFAFA.toInt())
-        return row
     }
 }
