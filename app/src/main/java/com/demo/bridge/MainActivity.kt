@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -15,6 +16,8 @@ class MainActivity : Activity() {
 
     companion object {
         const val REQ_EDIT = 1001
+        const val REQ_EXPORT = 1002
+        const val REQ_IMPORT = 1003
         const val PREFS = "bridge_prefs"
         const val KEY_CMDS = "commands"
     }
@@ -133,29 +136,97 @@ class MainActivity : Activity() {
             .setItems(opts) { _, which ->
                 when (which) {
                     0 -> startActivityForResult(Intent(this, EditCommandActivity::class.java).apply {
-                        putExtra("isEdit", true); putExtra("originalName", item.name)
-                        putExtra("name", item.name); putExtra("pkg", item.pkg); putExtra("action", item.action)
+                        putExtra("isEdit", true)
+                        putExtra("originalPos", pos)
+                        putExtra("name", item.name)
+                        putExtra("pkg", item.pkg)
+                        putExtra("action", item.action)
                     }, REQ_EDIT)
-                    1 -> Toast.makeText(this, "导入/导出：后续版本", Toast.LENGTH_SHORT).show()
+                    1 -> {
+                        val popup = PopupMenu(this, it as View)
+                        popup.menu.add("导出")
+                        popup.menu.add("导入")
+                        popup.setOnMenuItemClickListener { mi ->
+                            when (mi.title.toString()) {
+                                "导出" -> exportCommands()
+                                "导入" -> importCommands()
+                            }
+                            true
+                        }
+                        popup.show()
+                    }
                     2 -> BridgeExecutor.testExecute(this, item)
                     3 -> { items.removeAt(pos); saveData(); adapter.notifyDataSetChanged() }
                 }
             }.show()
     }
 
+    private fun exportCommands() {
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+            putExtra(Intent.EXTRA_TITLE, "bridge_export.json")
+        }
+        startActivityForResult(intent, REQ_EXPORT)
+    }
+
+    private fun importCommands() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+        }
+        startActivityForResult(intent, REQ_IMPORT)
+    }
+
     override fun onActivityResult(req: Int, res: Int, data: Intent?) {
         super.onActivityResult(req, res, data)
-        if (req == REQ_EDIT && res == RESULT_OK && data != null) {
-            val name = data.getStringExtra("name") ?: return
-            val pkg = data.getStringExtra("pkg") ?: ""
-            val action = data.getStringExtra("action") ?: ""
-            val isEdit = data.getBooleanExtra("isEdit", false)
-            val orig = data.getStringExtra("originalName") ?: ""
-            if (isEdit) {
-                val idx = items.indexOfFirst { it.name == orig }
-                if (idx >= 0) items[idx] = CommandItem(name, pkg, action, items[idx].enabled)
-            } else items.add(CommandItem(name, pkg, action, false))
-            saveData(); adapter.notifyDataSetChanged()
+        if (res != RESULT_OK || data == null) return
+
+        when (req) {
+            REQ_EDIT -> {
+                val name = data.getStringExtra("name") ?: return
+                val pkg = data.getStringExtra("pkg") ?: ""
+                val action = data.getStringExtra("action") ?: ""
+                val isEdit = data.getBooleanExtra("isEdit", false)
+                val pos = data.getIntExtra("originalPos", -1)
+                if (isEdit && pos in items.indices) {
+                    items[pos] = CommandItem(name, pkg, action, items[pos].enabled)
+                } else {
+                    items.add(CommandItem(name, pkg, action, false))
+                }
+                saveData(); adapter.notifyDataSetChanged()
+            }
+            REQ_EXPORT -> {
+                data.data?.let { uri ->
+                    val arr = JSONArray()
+                    items.forEach {
+                        val o = JSONObject()
+                        o.put("name", it.name); o.put("pkg", it.pkg)
+                        o.put("action", it.action); o.put("enabled", it.enabled)
+                        arr.put(o)
+                    }
+                    contentResolver.openOutputStream(uri)?.use { it.write(arr.toString().toByteArray()) }
+                    Toast.makeText(this, "导出成功", Toast.LENGTH_SHORT).show()
+                }
+            }
+            REQ_IMPORT -> {
+                data.data?.let { uri ->
+                    contentResolver.openInputStream(uri)?.use { ins ->
+                        val txt = ins.bufferedReader().readText()
+                        val arr = JSONArray(txt)
+                        items.clear()
+                        for (i in 0 until arr.length()) {
+                            val o = arr.getJSONObject(i)
+                            items.add(CommandItem(
+                                o.getString("name"), o.optString("pkg"),
+                                o.optString("action"), o.optBoolean("enabled", false)
+                            ))
+                        }
+                        saveData(); adapter.notifyDataSetChanged()
+                        Toast.makeText(this, "导入成功", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 
