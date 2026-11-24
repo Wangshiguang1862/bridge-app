@@ -130,37 +130,39 @@ class MainActivity : Activity() {
     }
 
     private fun showItemMenu(item: CommandItem, pos: Int) {
-        val opts = arrayOf("编辑", "导入/导出", "测试执行", "删除")
-        AlertDialog.Builder(this)
-            .setTitle(item.name)
-            .setItems(opts) { _, which ->
-                when (which) {
-                    0 -> startActivityForResult(Intent(this, EditCommandActivity::class.java).apply {
-                        putExtra("isEdit", true)
-                        putExtra("originalPos", pos)
-                        putExtra("name", item.name)
-                        putExtra("pkg", item.pkg)
-                        putExtra("action", item.action)
-                    }, REQ_EDIT)
-                    1 -> {
-                        val popup = PopupMenu(this, it as View)
-                        popup.menu.add("导出")
-                        popup.menu.add("导入")
-                        popup.setOnMenuItemClickListener { mi ->
-                            when (mi.title.toString()) {
-                                "导出" -> exportCommands()
-                                "导入" -> importCommands()
-                            }
-                            true
+    val opts = arrayOf("编辑", "导入/导出", "测试执行", "删除")
+    AlertDialog.Builder(this)
+        .setTitle(item.name)
+        .setItems(opts) { _, which ->
+            when (which) {
+                0 -> startActivityForResult(Intent(this, EditCommandActivity::class.java).apply {
+                    putExtra("isEdit", true)
+                    putExtra("originalPos", pos)
+                    putExtra("name", item.name)
+                    putExtra("pkg", item.pkg)
+                    putExtra("action", item.action)
+                }, REQ_EDIT)
+                1 -> {
+                    val anchor = listView.getChildAt(pos - listView.firstVisiblePosition)
+                        ?: listView
+                    val popup = PopupMenu(this, anchor)
+                    popup.menu.add("导出")
+                    popup.menu.add("导入")
+                    popup.setOnMenuItemClickListener { mi ->
+                        when (mi.title.toString()) {
+                            "导出" -> exportCommands()
+                            "导入" -> importCommands()
                         }
-                        popup.show()
+                        true
                     }
-                    2 -> BridgeExecutor.testExecute(this, item)
-                    3 -> { items.removeAt(pos); saveData(); adapter.notifyDataSetChanged() }
+                    popup.show()
                 }
-            }.show()
-    }
-
+                2 -> BridgeExecutor.testExecute(this, item)
+                3 -> { items.removeAt(pos); saveData(); adapter.notifyDataSetChanged() }
+            }
+        }.show()
+}
+        
     private fun exportCommands() {
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
