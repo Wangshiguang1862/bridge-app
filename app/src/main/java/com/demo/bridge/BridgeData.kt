@@ -8,7 +8,6 @@ import org.json.JSONObject
  * 命令数据读写：统一走 SharedPreferences("bridge_prefs") 的 "commands" 字段，
  * 内容为 JSONArray 字符串。CommandItem 定义在同包 CommandItem.kt 中。
  */
-
 object BridgeData {
 
     const val PREFS_NAME = "bridge_prefs"
@@ -33,7 +32,8 @@ object BridgeData {
                     CommandItem(
                         name = name,
                         pkg = o.optString("pkg", "").trim(),
-                        action = o.optString("action", "").trim()
+                        action = o.optString("action", "").trim(),
+                        enabled = o.optBoolean("enabled", false)
                     )
                 )
             }
@@ -46,11 +46,12 @@ object BridgeData {
     /** 整体覆盖保存（导入 = 清空替换，也走这里） */
     fun saveItems(context: Context, items: List<CommandItem>) {
         val arr = JSONArray()
-        items.forEach { it ->
+        items.forEach { item ->
             val o = JSONObject()
-            o.put("name", it.name)
-            o.put("pkg", it.pkg)
-            o.put("action", it.action)
+            o.put("name", item.name)
+            o.put("pkg", item.pkg)
+            o.put("action", item.action)
+            o.put("enabled", item.enabled)
             arr.put(o)
         }
         prefs(context).edit().putString(KEY_COMMANDS, arr.toString()).apply()
@@ -72,11 +73,12 @@ object BridgeData {
     /** 序列化为导出用 JSON 数组字符串 */
     fun toJson(items: List<CommandItem>): String {
         val arr = JSONArray()
-        items.forEach {
+        items.forEach { item ->
             val o = JSONObject()
-            o.put("name", it.name)
-            o.put("pkg", it.pkg)
-            o.put("action", it.action)
+            o.put("name", item.name)
+            o.put("pkg", item.pkg)
+            o.put("action", item.action)
+            o.put("enabled", item.enabled)
             arr.put(o)
         }
         return arr.toString()
@@ -96,7 +98,8 @@ object BridgeData {
                     CommandItem(
                         name = name,
                         pkg = o.optString("pkg", "").trim(),
-                        action = o.optString("action", "").trim()
+                        action = o.optString("action", "").trim(),
+                        enabled = o.optBoolean("enabled", false)
                     )
                 )
             }
