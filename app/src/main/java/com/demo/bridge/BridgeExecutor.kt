@@ -4,8 +4,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
+import java.io.DataOutputStream
 
+/**
+ * Bridge 命令执行器 — 权限降级链：
+ * root(su) → Shizuku → adb → 无授权基础命令
+ * 每一层探测失败自动掉到下一层，界面状态跟随真实可用通道。
+ * 不依赖任何外部库：Shizuku 通过反射探测，未装 SDK 也不会崩。
+ */
 object BridgeExecutor {
 
     sealed interface ExecMode {
@@ -30,10 +36,10 @@ object BridgeExecutor {
     }
 
     fun modeLabel(): String = when (currentMode()) {
-        ExecMode.Root -> "运行模式：Root"
-        ExecMode.Shizuku -> "运行模式：Shizuku"
-        ExecMode.Adb -> "运行模式：ADB"
-        ExecMode.Plain -> "运行模式：基础命令（无授权）"
+        ExecMode.Root -> "● 运行模式：Root"
+        ExecMode.Shizuku -> "● 运行模式：Shizuku"
+        ExecMode.Adb -> "● 运行模式：ADB"
+        ExecMode.Plain -> "● 运行模式：基础命令（无授权）"
     }
 
     fun refreshModeLabel(
@@ -41,7 +47,9 @@ object BridgeExecutor {
         apply: (String) -> Unit
     ) {
         val label = modeLabel()
-        Handler(Looper.getMainLooper()).post { apply(label) }
+        Handler(Looper.getMainLooper()).post {
+            apply(label)
+        }
     }
 
     fun exec(action: String): String {
