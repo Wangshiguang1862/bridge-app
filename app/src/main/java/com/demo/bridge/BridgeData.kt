@@ -1,12 +1,12 @@
 package com.demo.bridge
-import com.demo.bridge.CommandItem
+
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * 命令数据读写：统一走 SharedPreferences("bridge_prefs") 的 "commands" 字段，
- * 内容为 JSONArray 字符串。CommandItem 也定义在本文件，避免跨文件引用丢失。
+ * 内容为 JSONArray 字符串。CommandItem 定义在同包 CommandItem.kt 中。
  */
 
 object BridgeData {
