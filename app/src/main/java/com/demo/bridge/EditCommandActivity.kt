@@ -7,7 +7,9 @@ import android.widget.*
 class EditCommandActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = if (intent.getBooleanExtra("isEdit", false)) "编辑命令" else "添加命令"
+        val isEdit = intent.getBooleanExtra("isEdit", false)
+        val originalPos = intent.getIntExtra("originalPos", -1)
+        title = if (isEdit) "编辑命令" else "添加命令"
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -24,9 +26,16 @@ class EditCommandActivity : Activity() {
         root.addView(Button(this).apply {
             text = "保存"
             setOnClickListener {
-                intent.putExtra("name", etName.text.toString())
-                intent.putExtra("pkg", etPkg.text.toString())
-                intent.putExtra("action", etAction.text.toString())
+                val name = etName.text.toString().trim()
+                val pkg = etPkg.text.toString().trim()
+                val action = etAction.text.toString().trim()
+                if (name.isEmpty()) return@setOnClickListener
+
+                intent.putExtra("name", name)
+                intent.putExtra("pkg", pkg)
+                intent.putExtra("action", action)
+                intent.putExtra("isEdit", isEdit)
+                intent.putExtra("originalPos", originalPos)
                 setResult(RESULT_OK, intent)
                 finish()
             }
