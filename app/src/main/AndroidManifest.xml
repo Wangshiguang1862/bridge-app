@@ -30,6 +30,7 @@
         <activity android:name=".SettingsActivity" android:exported="false" />
         <activity android:name=".EditCommandActivity" android:exported="false" />
         <activity android:name=".LogListActivity" android:exported="false" />
+        <activity android:name=".ExportSelectActivity" android:exported="false" />
 
         <receiver
             android:name=".BridgeCommandReceiver"
