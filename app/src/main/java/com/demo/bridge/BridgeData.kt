@@ -8,11 +8,6 @@ import org.json.JSONObject
  * 命令数据读写：统一走 SharedPreferences("bridge_prefs") 的 "commands" 字段，
  * 内容为 JSONArray 字符串。CommandItem 也定义在本文件，避免跨文件引用丢失。
  */
-data class CommandItem(
-    val name: String,
-    val pkg: String = "",
-    val action: String
-)
 
 object BridgeData {
 
