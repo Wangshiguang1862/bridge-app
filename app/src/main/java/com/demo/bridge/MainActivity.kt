@@ -49,7 +49,11 @@ class MainActivity : Activity() {
         val btnSettings = Button(this).apply {
             text = "设置"
             setOnClickListener {
-                startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                try {
+                    startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
+                } catch (_: Throwable) {
+                    Toast.makeText(this@MainActivity, "设置页面未实现", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -58,7 +62,7 @@ class MainActivity : Activity() {
         header.addView(btnSettings)
         root.addView(header)
 
-        // 操作栏：添加
+        // 操作栏：添加 + 导入导出
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -68,7 +72,11 @@ class MainActivity : Activity() {
         val btnAdd = Button(this).apply {
             text = "+ 添加"
             setOnClickListener {
-                startActivity(Intent(this@MainActivity, EditCommandActivity::class.java))
+                try {
+                    startActivity(Intent(this@MainActivity, EditCommandActivity::class.java))
+                } catch (_: Throwable) {
+                    Toast.makeText(this@MainActivity, "编辑页面未实现", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
@@ -97,12 +105,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        // 刷新模式状态
         BridgeExecutor.invalidate()
         BridgeExecutor.refreshModeLabel(this) { label ->
             tvMode.text = label
         }
-        // 重新加载命令
         loadData()
         renderList()
     }
