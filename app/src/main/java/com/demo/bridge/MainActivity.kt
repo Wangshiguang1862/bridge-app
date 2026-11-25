@@ -121,32 +121,35 @@ class MainActivity : Activity() {
     }
 
     private fun showAddDialog() {
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 12, 24, 12) }
-        val etName = EditText(this).apply { hint = "命令名称" }
-        val etPkg = EditText(this).apply { hint = "包名（可选）" }
-        val etAction = EditText(this).apply { hint = "执行命令，如 am start -n ..." }
-        box.addView(etName); box.addView(etPkg); box.addView(etAction)
+    val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 12, 24, 12) }
+    val etName = EditText(this).apply { hint = "命令名称（必填）" }
+    val etPkg = EditText(this).apply { hint = "包名（可选）" }
+    val etAction = EditText(this).apply { hint = "执行命令或延时毫秒数"; minLines = 3 }
+    val spinnerType = Spinner(this)
+    spinnerType.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, arrayOf("shell", "delay", "js"))
+    box.addView(etName); box.addView(etPkg); box.addView(etAction); box.addView(spinnerType)
 
-        AlertDialog.Builder(this)
-            .setTitle("添加命令")
-            .setView(box)
-            .setPositiveButton("保存") { _, _ ->
-                val name = etName.text.toString().trim()
-                val action = etAction.text.toString().trim()
-                if (name.isEmpty() || action.isEmpty()) {
-                    Toast.makeText(this, "名称和执行命令不能为空", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                BridgeData.addItem(
-                    this,
-                    CommandItem(name = name, pkg = etPkg.text.toString().trim(), action = action)
-                )
-                loadData(); renderList()
-                Toast.makeText(this, "已添加", Toast.LENGTH_SHORT).show()
+    AlertDialog.Builder(this)
+        .setTitle("添加命令")
+        .setView(box)
+        .setPositiveButton("保存") { _, _ ->
+            val name = etName.text.toString().trim()
+            val action = etAction.text.toString().trim()
+            if (name.isEmpty() || action.isEmpty()) {
+                Toast.makeText(this, "名称和执行内容不能为空", Toast.LENGTH_SHORT).show()
+                return@setPositiveButton
             }
-            .setNegativeButton("取消", null)
-            .show()
-    }
+            val type = spinnerType.selectedItem as String
+            BridgeData.addItem(
+                this,
+                CommandItem(name = name, pkg = etPkg.text.toString().trim(), action = action, type = type)
+            )
+            loadData(); renderList()
+            Toast.makeText(this, "已添加", Toast.LENGTH_SHORT).show()
+        }
+        .setNegativeButton("取消", null)
+        .show()
+}
 
     private fun runItem(item: CommandItem) {
         if (item.action.isBlank()) {
