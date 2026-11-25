@@ -1,118 +1,87 @@
 package com.demo.bridge
 
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Handler
-import android.os.Looper
 
 object BridgeExecutor {
 
-    sealed interface ExecMode {
-        data object Root : ExecMode
-        data object Shizuku : ExecMode
-        data object Adb : ExecMode
-        data object Plain : ExecMode
-    }
-
-    @Volatile
-    private var cachedMode: ExecMode? = null
+    private var cachedMode: String = "plain"
 
     fun invalidate() {
-        cachedMode = null
+        cachedMode = "plain"
     }
 
-    fun currentMode(): ExecMode {
-        cachedMode?.let { return it }
-        val mode = detectMode()
-        cachedMode = mode
-        return mode
+    fun modeLabel(): String = cachedMode
+
+    fun refreshModeLabel(context: Context, callback: (String) -> Unit) {
+        Thread {
+            val mode = if (ShizukuDelegate.available()) {
+                "shizuku"
+            } else {
+                val result = exec("id")
+                if (result.contains("uid=0")) "root" else "plain"
+            }
+            cachedMode = mode
+            callback.invoke(mode)
+        }.start()
     }
 
-    fun modeLabel(): String = when (currentMode()) {
-        ExecMode.Root -> "● 运行模式：Root"
-        ExecMode.Shizuku -> "● 运行模式：Shizuku"
-        ExecMode.Adb -> "● 运行模式：ADB"
-        ExecMode.Plain -> "● 运行模式：基础命令（无授权）"
-    }
-
-    fun refreshModeLabel(context: Context, apply: (String) -> Unit) {
-        val label = modeLabel()
-        Handler(Looper.getMainLooper()).post { apply(label) }
-    }
-
-    fun exec(action: String): String {
-        return when (currentMode()) {
-            ExecMode.Root -> runCatching { execRoot(action) }.getOrElse { execPlain(action) }
-            ExecMode.Shizuku -> runCatching { execShizuku(action) }.getOrElse { execPlain(action) }
-            ExecMode.Adb -> execPlain(action)
-            ExecMode.Plain -> execPlain(action)
+    fun execByType(type: String, command: String): String {
+        return when (type) {
+            "delay" -> {
+                val ms = command.toLongOrNull() ?: 0L
+                if (ms > 0) Thread.sleep(ms)
+                "delayed ${ms}ms"
+            }
+            "js" -> {
+                if (!command.endsWith(".js")) {
+                    return "js 类型 action 必须是 .js 文件路径"
+                }
+                val scriptFile = java.io.File(command)
+                if (!scriptFile.exists()) {
+                    return "脚本文件不存在: $command"
+                }
+                val runtime = java.lang.Runtime.getRuntime()
+                return try {
+                    val process = runtime.exec(arrayOf("js", command))
+                    process.waitFor()
+                    val out = process.inputStream.bufferedReader().readText()
+                    val err = process.errorStream.bufferedReader().readText()
+                    if (out.isNotBlank()) out else if (err.isNotBlank()) err else "(无输出)"
+                } catch (_: Throwable) {
+                    if (ShizukuDelegate.available()) {
+                        try {
+                            val process = runtime.exec(arrayOf("node", command))
+                            process.waitFor()
+                            val out = process.inputStream.bufferedReader().readText()
+                            val err = process.errorStream.bufferedReader().readText()
+                            if (out.isNotBlank()) out else if (err.isNotBlank()) err else "(无输出)"
+                        } catch (e: Throwable) {
+                            "JS 执行失败: ${e.message}"
+                        }
+                    } else {
+                        "JS 执行需要系统 js 命令或 Shizuku 环境"
+                    }
+                }
+            }
+            else -> {
+                exec(command)
+            }
         }
     }
 
-    private fun detectMode(): ExecMode {
-        if (probeRoot()) return ExecMode.Root
-        if (probeShizuku()) return ExecMode.Shizuku
-        return ExecMode.Plain
-    }
-
-    private fun probeRoot(): Boolean {
+    fun exec(command: String): String {
         return try {
-            val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id -u"))
-            val uid = p.inputStream.bufferedReader().use { it.readText() }.trim()
-            p.waitFor(); p.destroy()
-            uid == "0"
-        } catch (_: Throwable) { false }
-    }
-
-    private fun probeShizuku(): Boolean {
-        return try {
-            val cls = Class.forName("rikka.shizuku.Shizuku")
-            if (cls.getMethod("pingBinder").invoke(null) != true) return false
-            val perm = cls.getMethod("checkSelfPermission").invoke(null) as Int
-            if (perm != PackageManager.PERMISSION_GRANTED) return false
-            val newProcess = cls.getMethod(
-                "newProcess",
-                Array<String>::class.java,
-                Array<String>::class.java,
-                String::class.java
-            )
-            val proc = newProcess.invoke(null, arrayOf("sh", "-c", "id -u"), null, null) as Process
-            val out = proc.inputStream.bufferedReader().use { it.readText() }.trim()
-            proc.waitFor(); proc.destroy()
-            out.isNotBlank()
-        } catch (_: Throwable) { false }
-    }
-
-    private fun execRoot(cmd: String): String {
-        val p = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
-        return readProcess(p)
-    }
-
-    private fun execShizuku(cmd: String): String {
-        val cls = Class.forName("rikka.shizuku.Shizuku")
-        val newProcess = cls.getMethod(
-            "newProcess",
-            Array<String>::class.java,
-            Array<String>::class.java,
-            String::class.java
-        )
-        val proc = newProcess.invoke(null, arrayOf("sh", "-c", cmd), null, null) as Process
-        return readProcess(proc)
-    }
-
-    private fun execPlain(cmd: String): String {
-        val p = Runtime.getRuntime().exec(arrayOf("sh", "-c", cmd))
-        return readProcess(p)
-    }
-
-    private fun readProcess(p: Process): String {
-        val out = p.inputStream.bufferedReader().use { it.readText() }
-        val err = p.errorStream.bufferedReader().use { it.readText() }
-        p.waitFor(); p.destroy()
-        return when {
-            out.isNotBlank() -> out
-            err.isNotBlank() -> err
-            else -> "(无输出)"
+            if (ShizukuDelegate.available()) {
+                ShizukuDelegate.exec(command)
+            } else {
+                val process = java.lang.Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+                process.waitFor()
+                val out = process.inputStream.bufferedReader().readText()
+                val err = process.errorStream.bufferedReader().readText()
+                if (out.isNotBlank()) out else if (err.isNotBlank()) err else "(无输出)"
+            }
+        } catch (e: Throwable) {
+            e.message ?: "exec failed"
         }
     }
 }
