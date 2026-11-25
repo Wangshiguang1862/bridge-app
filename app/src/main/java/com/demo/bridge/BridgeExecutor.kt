@@ -71,17 +71,19 @@ object BridgeExecutor {
 
     fun exec(command: String): String {
         return try {
-            if (ShizukuDelegate.available()) {
-                ShizukuDelegate.exec(command)
-            } else {
-                val process = java.lang.Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
-                process.waitFor()
-                val out = process.inputStream.bufferedReader().readText()
-                val err = process.errorStream.bufferedReader().readText()
-                if (out.isNotBlank()) out else if (err.isNotBlank()) err else "(无输出)"
-            }
-        } catch (e: Throwable) {
-            e.message ?: "exec failed"
+        if (ShizukuDelegate.available()) {
+            val result = ShizukuDelegate.exec(command)
+            result.second.ifBlank { "exit=${result.first}" }
+        } else {
+            val process = java.lang.Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+            process.waitFor()
+            val out = process.inputStream.bufferedReader().readText()
+            val err = process.errorStream.bufferedReader().readText()
+            if (out.isNotBlank()) out else if (err.isNotBlank()) err else "(无输出)"
         }
+    } catch (e: Throwable) {
+        e.message ?: "exec failed"
     }
+}
+    
 }
